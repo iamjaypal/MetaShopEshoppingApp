@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base::layout(~{::section})}">
+<head>
+    <meta charset="UTF-8">
+    <title>User List</title>
+</head>
+<body>
+<section>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-12">
+                <h3 class="text-center mb-4">All Users</h3>
+
+                <!-- Success or Error Message -->
+                <th:block th:if="${session.successMsg}">
+                    <p class="text-success fw-bold text-center">
+                        [[${session.successMsg}]]
+                    </p>
+                    <th:block th:text="${@commnServiceImpl.removeSessionMessage()}"></th:block>
+                </th:block>
+                <th:block th:if="${session.errorMsg}">
+                    <p class="text-danger fw-bold text-center">
+                        [[${session.errorMsg}]]
+                    </p>
+                    <th:block th:text="${@commnServiceImpl.removeSessionMessage()}"></th:block>
+                </th:block>
+
+                <div class="card shadow">
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover align-middle text-center">
+                                <thead class="table-dark">
+                                <tr>
+                                    <th>Sr. No</th>
+                                    <th>Profile</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Enabled</th>
+                                    <th>Actions</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                <tr th:each="user, stat : ${users}">
+                                    <td th:text="${stat.index + 1}"></td>
+                                    <td>
+                                        <img th:src="@{'/profile-img/' + ${user.profileImage}}"
+                                             class="rounded-circle img-thumbnail"
+                                             width="60" height="60" alt="Profile"/>
+                                    </td>
+                                    <td th:text="${user.name}"></td>
+                                    <td th:text="${user.email}"></td>
+                                    <td>
+                                        <form th:action="@{'/admin/deleteUser/' + ${user.id}}" method="post">
+                                            <button class="btn btn-sm btn-danger" type="submit">Delete</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(users)}">
+                                    <td colspan="6" class="text-center">No users found.</td>
+                                </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <!-- Optional Add Button -->
+                        <a href="/admin/addUser" class="btn btn-primary mt-3">Add New User</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+</body>
+</html>

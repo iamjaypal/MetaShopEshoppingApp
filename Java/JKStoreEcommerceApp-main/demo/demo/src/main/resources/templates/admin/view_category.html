@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html
+  lang="en"
+  xmlns:th="http://www.thymeleaf.org"
+  th:replace="~{base::layout(~{::section})}"
+>
+  <head>
+    <meta charset="ISO-8859-1" />
+    <title>Category List</title>
+  </head>
+  <body>
+    <section>
+      <div class="container mt-4">
+        <div class="row">
+          <div class="col-md-12">
+            <h3 class="text-center mb-4">All Categories</h3>
+
+            <!-- Success or Error Message -->
+            <th:block th:if="${session.successMsg}">
+              <p class="text-success fw-bold text-center">
+                [[${session.successMsg}]]
+              </p>
+              <th:block
+                th:text="${@commnServiceImpl.removeSessionMessage()}"
+              ></th:block>
+            </th:block>
+            <th:block th:if="${session.errorMsg}">
+              <p class="text-danger fw-bold text-center">
+                [[${session.errorMsg}]]
+              </p>
+              <th:block
+                th:text="${@commnServiceImpl.removeSessionMessage()}"
+              ></th:block>
+            </th:block>
+
+            <div class="card shadow">
+              <div class="card-body">
+                <div class="table-responsive">
+                  <table
+                    class="table table-bordered table-hover align-middle text-center"
+                  >
+                    <thead class="table-dark">
+                      <tr>
+                        <th>#ID</th>
+                        <th>Category Name</th>
+                        <th>Status</th>
+                        <th>Image</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr th:each="c : ${categories}">
+                        <td>[[${c.id}]]</td>
+                        <td>[[${c.name}]]</td>
+                        <td>
+                          <span th:if="${c.isActive}" class="badge bg-success"
+                            >Active</span
+                          >
+                          <span
+                            th:unless="${c.isActive}"
+                            class="badge bg-danger"
+                            >Inactive</span
+                          >
+                        </td>
+                        <td>
+                          <img
+                            th:src="@{/img/category_img/{image}(image=${c.imageName})}"
+                            alt="Image"
+                            style="width: 60px; height: 60px; object-fit: cover"
+                            class="rounded"
+                          />
+                        </td>
+                        <td>
+                          <a
+                            th:href="@{'/admin/edit-category/' + ${c.id}}"
+                            class="btn btn-sm btn-warning"
+                            >Edit</a
+                          >
+                          <form
+                            th:action="@{'/admin/deleteCategory/' + ${c.id}}"
+                            method="post"
+                            style="display: inline"
+                          >
+                            <button class="btn btn-danger btn-sm" type="submit">
+                              Delete
+                            </button>
+                          </form>
+                        </td>
+                      </tr>
+                      <tr th:if="${#lists.isEmpty(categories)}">
+                        <td colspan="5" class="text-center">
+                          No categories found.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <a href="/admin/category" class="btn btn-primary mt-3"
+                  >Add New Category</a
+                >
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </body>
+</html>
