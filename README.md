@@ -13,7 +13,7 @@ Foundational choices and deviations are recorded in [`docs/DECISIONS.md`](docs/D
 | **discovery-server** | **8761** | ✅ complete (see below) |
 | **api-gateway** | **8080** | ✅ complete (see below) |
 | **inventory-service** | **8083** | ✅ complete (see below) |
-| cart-service | 8084 | ⬜ scaffold only |
+| **cart-service** | **8084** | ✅ complete (see below) |
 | order-service | 8085 | ⬜ scaffold only |
 | payment-service | 8086 | ⬜ scaffold only |
 | notification-service | 8087 | ⬜ not started |
@@ -30,7 +30,8 @@ MetaShop/
 ├── api-gateway/                # Spring Cloud Gateway (:8080) — complete
 ├── auth-service/               # auth / users         (:8081) — complete
 ├── product-service/            # catalog              (:8082) — complete
-└── inventory-service/          # stock & reservations (:8083) — complete
+├── inventory-service/          # stock & reservations (:8083) — complete
+└── cart-service/               # shopping cart        (:8084) — complete
 ```
 
 > Runtime versions are pinned to what is already in use: **Java 21** and **Spring Boot 4.1.0**
@@ -41,20 +42,21 @@ MetaShop/
 
 ## Running the stack
 
-Start the five services in this order (each in its own terminal, from the repo root):
+Start the six services in this order (each in its own terminal, from the repo root):
 
 ```bash
 cd discovery-server   && ./mvnw spring-boot:run   # :8761  registry (start first)
 cd auth-service       && ./mvnw spring-boot:run   # :8081
 cd product-service    && ./mvnw spring-boot:run   # :8082
 cd inventory-service  && ./mvnw spring-boot:run   # :8083
+cd cart-service       && ./mvnw spring-boot:run   # :8084
 cd api-gateway        && ./mvnw spring-boot:run   # :8080  public entry point (start last)
 ```
 
 Then:
 
 - Eureka dashboard: http://localhost:8761/ — should list `API-GATEWAY`, `AUTH-SERVICE`,
-  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`
+  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`, `CART-SERVICE`
 - Gateway route table: http://localhost:8080/actuator/gateway/routes
 - Everything goes through **http://localhost:8080** — e.g.
   `curl http://localhost:8080/api/v1/products?size=2`
@@ -138,6 +140,7 @@ Requires discovery-server plus at least one downstream service to be running.
 | `/api/v1/{products,categories,brands}/**` | `lb://product-service` | Public |
 | `/api/v1/admin/inventory/**` | `lb://inventory-service` | ADMIN |
 | `/api/v1/inventory/**` | `lb://inventory-service` | Public |
+| `/api/v1/cart/**` | `lb://cart-service` | JWT |
 | `/api/v1/internal/**` | — | **not routed** (404) |
 
 ### Configuration
@@ -465,3 +468,102 @@ order-service can never hold or return stock twice.
 - Redis cache for hot availability reads — §8.4
 - Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
 - Back-fill `X-Internal-Token` onto auth-service and product-service `/internal/**` — D-022, D-050
+
+---
+
+## cart-service
+
+One shopping cart per user (spec §10). The cart stores only `productId` + `quantity` + the price at
+add time; **name, image, live price and stock are fetched from product-service / inventory-service
+on every render**, so a line can never go stale in the database and the UI can flag "price changed
+since you added this" and "only 2 left" (D-058).
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Data JPA (Hibernate 7) · MySQL 8 · **Flyway** · Spring Security
+(JWT verification + internal-token filter) · Eureka client · **OpenFeign + Spring Cloud LoadBalancer
++ Resilience4j** (retry + circuit breakers on the downstream calls, D-062) · Lombok ·
+springdoc-openapi (Swagger UI) · JUnit 5 + Mockito + MockMvc.
+
+### Prerequisites
+- Java 21
+- MySQL 8 running on `localhost:3306` with a `root` user (dev credentials in
+  `src/main/resources/application.properties`)
+- product-service (`:8082`) and inventory-service (`:8083`) reachable — the cart renders their data
+
+Create the (empty) schema once; Flyway creates all tables:
+
+```sql
+CREATE DATABASE metashop_cart_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Run
+
+```bash
+cd cart-service
+./mvnw spring-boot:run         # starts on :8084
+```
+
+- Swagger UI: http://localhost:8084/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:8084/v3/api-docs
+
+### Test
+
+```bash
+cd cart-service
+./mvnw test
+```
+
+39 tests. MySQL must be reachable: the context test runs Flyway + Hibernate validation.
+
+### API
+
+Full reference in [`docs/API.md`](docs/API.md). Highlights (all JWT — the owner is the token
+subject, D-059):
+
+| Area | Endpoints |
+|---|---|
+| Read | `GET /api/v1/cart` — live prices, line totals, subtotal, per-line warnings |
+| Write | `POST /api/v1/cart/items` (add/merge), `PUT /api/v1/cart/items/{itemId}` (absolute quantity), `DELETE /api/v1/cart/items/{itemId}`, `DELETE /api/v1/cart` |
+| Checkout | `POST /api/v1/cart/validate` — pre-checkout issues, always 200 (D-060) |
+| Internal | `DELETE /api/v1/internal/cart/{userId}` — order-service clears the cart after confirmation (D-061) |
+
+Every mutation returns the **whole updated cart**, so the UI refreshes from one round trip.
+
+### Failures you can get (and why they are honest)
+
+| Situation | Status |
+|---|---|
+| Unknown product | `404` |
+| Product deactivated | `422` |
+| Over 20 units of one product / 50 distinct products | `422` |
+| Not enough stock for the resulting quantity | `409` with `{productId, available}` |
+| product-service / inventory-service down or breaker open | `503` — no stale prices are ever rendered (D-058) |
+
+A concurrent double-add is decided by the unique key on `(cart_id, product_id)`: the loser retries
+once onto the update branch (D-063). Racing cart-row mutations make the loser fail with a retryable
+`409` (`@Version`).
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `server.port` | `8084` | spec §3.1 |
+| `spring.datasource.url` | `jdbc:mysql://localhost:3306/metashop_cart_db` | |
+| `eureka.client.service-url.defaultZone` | `http://localhost:8761/eureka` | env `EUREKA_URL` |
+| `metashop.jwt.secret` | dev key | **must equal auth-service's**; env `JWT_SECRET` |
+| `metashop.jwt.issuer` | `metashop-auth-service` | |
+| `metashop.internal.token` | dev token | env `INTERNAL_TOKEN`; guards `/api/v1/internal/cart/**` and signs outbound Feign calls |
+| `metashop.cart.max-quantity-per-item` | `20` | mirrored by a `CHECK` in the migration |
+| `metashop.cart.max-distinct-items` | `50` | keeps the downstream batch calls small |
+| `metashop.resilience.*` | 3 attempts, 10-call window | retry + circuit-breaker tuning (D-062) |
+| `spring.cloud.openfeign.client.config.default.*` | 2 s connect / 5 s read | the downstream timeout |
+
+### Database migrations
+
+`src/main/resources/db/migration/V1__init.sql` creates `carts` and `cart_items`. Hibernate runs with
+`ddl-auto=validate`.
+
+### Still to do (later phases)
+- `CartClearedEvent` publishing (Kafka) — §14
+- Guest carts, once the platform defines an anonymous identity (D-059)
+- Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase

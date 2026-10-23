@@ -17,9 +17,9 @@ import org.springframework.context.annotation.Configuration;
  * the downstream services unchanged. Each route carries an {@link com.shopMeta.api_gateway.security.AuthRequirement}
  * so the JWT filter does not have to hard-code path rules.
  *
- * <p>Only services that are actually deployed get a route: auth-service, product-service and
- * inventory-service today. Routes for cart-service, order-service and payment-service are added as
- * those services land. {@code /api/v1/internal/**} is deliberately <em>not</em> routed: internal,
+ * <p>Only services that are actually deployed get a route: auth-service, product-service,
+ * inventory-service and cart-service today. Routes for order-service and payment-service are added
+ * as those services land. {@code /api/v1/internal/**} is deliberately <em>not</em> routed: internal,
  * service-to-service endpoints must never be reachable from the outside (spec 5.4 / 19).
  */
 @Configuration
@@ -70,6 +70,14 @@ public class GatewayRoutesConfig {
                         .path("/api/v1/inventory/**")
                         .metadata(METADATA_KEY, PUBLIC.name())
                         .uri("lb://inventory-service"))
+
+                // ---------- cart-service (:8084) ----------
+                // The whole cart is user-scoped, so every endpoint needs a JWT. There is no public
+                // cart read (spec 10.3). /api/v1/internal/cart/** stays unrouted.
+                .route("cart-service", r -> r
+                        .path("/api/v1/cart/**")
+                        .metadata(METADATA_KEY, JWT.name())
+                        .uri("lb://cart-service"))
 
                 .build();
     }

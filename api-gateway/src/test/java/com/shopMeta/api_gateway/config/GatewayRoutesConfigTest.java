@@ -88,6 +88,14 @@ class GatewayRoutesConfigTest {
     }
 
     @Test
+    void cartRequiresJwt() {
+        Route route = routes().get("cart-service");
+        assertThat(route).isNotNull();
+        assertThat(route.getUri().toString()).isEqualTo("lb://cart-service");
+        assertThat(route.getMetadata().get(METADATA_KEY)).isEqualTo(JWT.name());
+    }
+
+    @Test
     void internalEndpointsAreNeverRouted() {
         assertThat(routeLocator.getRoutes().collectList().block())
                 .noneMatch(route -> route.getPredicate() != null

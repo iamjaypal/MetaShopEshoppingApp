@@ -4,7 +4,8 @@
 
 Direct service ports (bypass the gateway; used for service-to-service calls and debugging):
 auth-service `http://localhost:8081` · product-service `http://localhost:8082` ·
-inventory-service `http://localhost:8083` · discovery-server (Eureka) `http://localhost:8761`
+inventory-service `http://localhost:8083` · cart-service `http://localhost:8084` ·
+discovery-server (Eureka) `http://localhost:8761`
 Swagger UI: `/swagger-ui/index.html` · OpenAPI JSON: `/v3/api-docs` (per service)
 
 All services use the `/api/v1/...` base path, and the gateway forwards it unchanged. See
@@ -45,6 +46,7 @@ limiting, and routes to services through Eureka (`lb://<service-name>`).
 | `/api/v1/products/**`, `/categories/**`, `/brands/**` | `lb://product-service` | Public |
 | `/api/v1/admin/inventory/**` | `lb://inventory-service` | ADMIN |
 | `/api/v1/inventory/**` | `lb://inventory-service` | Public |
+| `/api/v1/cart/**` | `lb://cart-service` | JWT |
 | `/api/v1/internal/**` | — | **not routed** (404) |
 
 ### Headers
@@ -423,6 +425,84 @@ Internal callers see the **exact** quantity, unlike the capped public endpoint.
 `reserve` uses a single conditional `UPDATE ... WHERE available_quantity >= :quantity`; the loser of
 a race updates zero rows and gets `409`. See D-052 and
 `src/test/java/com/shopMeta/inventory_service/concurrency/ReservationConcurrencyTest.java`.
+
+---
+
+## Cart Service (`:8084`)
+
+One cart per user, owned by the JWT subject. The cart stores only `productId` + `quantity` +
+the price at add time; **name, image, live price and stock are fetched on every read** from
+product-service and inventory-service, so a line can never go stale in the database (spec 10.2).
+All endpoints are JWT — there are no guest carts, because the platform has no anonymous identity yet.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/cart` | JWT | The caller's cart with live prices, line totals, subtotal and stock warnings. An empty cart is `200` with empty `items`, never `404`. |
+| POST | `/api/v1/cart/items` | JWT | Add a product, or merge into an existing line. Body: `productId`, `quantity` (1..20). Validates product + stock first. |
+| PUT | `/api/v1/cart/items/{itemId}` | JWT | Set a line to an absolute quantity (1..20). `itemId` is the line id from the cart response. |
+| DELETE | `/api/v1/cart/items/{itemId}` | JWT | Remove one line → returns the updated cart. |
+| DELETE | `/api/v1/cart` | JWT | Empty the cart (the cart row is kept, so the next add is cheap). Idempotent. |
+| POST | `/api/v1/cart/validate` | JWT | Pre-checkout: is every line active, in stock and within limits? Always `200` — an invalid cart is an answer, not an error. |
+
+### Cart response
+
+```json
+{
+  "cartId": 3, "userId": 1,
+  "items": [ {
+    "itemId": 7, "productId": 50, "sku": "SKU-1049", "name": "Keyboard",
+    "imageUrl": "/uploads/products/50.png",
+    "unitPrice": 99.00, "addedPrice": 89.00, "priceChanged": true,
+    "quantity": 2, "lineTotal": 198.00,
+    "availableQuantity": 25, "inStock": true, "sufficient": true,
+    "productActive": true, "warning": null
+  } ],
+  "totalItems": 2, "distinctItems": 1, "subtotal": 198.00, "currency": "INR",
+  "hasWarnings": false, "warnings": [],
+  "updatedAt": "2026-10-23T13:05:00"
+}
+```
+
+- `unitPrice` / `lineTotal` / `subtotal` are **live** — an estimate of what the cart costs now, not a
+  quote. The authoritative amount is the order snapshot.
+- `priceChanged` + `addedPrice` let the UI flag "price changed since you added this".
+- `warning` explains why a line cannot be ordered right now (inactive, out of stock, "only N left",
+  over the quantity limit). Lines are **flagged, not silently dropped**.
+- `itemId` (not `productId`) is what `PUT` / `DELETE /items/{id}` use.
+
+### Validation rules
+
+| Situation | Status |
+|---|---|
+| Unknown `productId` | `404` |
+| Product deactivated / deleted in the catalogue | `422` |
+| More than 20 units of one product (`metashop.cart.max-quantity-per-item`) | `422` |
+| More than 50 distinct products (`metashop.cart.max-distinct-items`) | `422` |
+| Not enough stock for the resulting quantity | `409` with `data: {productId, available}` |
+| product-service / inventory-service unreachable or breaker open | `503` — the cart refuses rather than render stale prices |
+| Another user's `itemId` | `404` (indistinguishable from a missing line — ids are never leaked) |
+
+Mutations validate the product and the stock of the **resulting** quantity before writing, so the
+cart can never hold a line that is already impossible to order. The cart only *checks* stock —
+**reserving** it is order-service's job at checkout; between two checkouts the same unit can still
+be promised to someone else.
+
+### Internal (service-to-service)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| DELETE | `/api/v1/internal/cart/{userId}` | `X-Internal-Token` | Clear a user's cart after their order was confirmed. Idempotent; plain `204`. |
+
+Not routed by the Gateway (404 from the outside), same as the other internal APIs.
+
+### Concurrency
+
+The unique key on `(cart_id, product_id)` makes a concurrent double-add safe: the losing insert
+fails and the caller retries once onto the update path. The `carts` row carries a `@Version`
+column, so two racing mutations make the loser fail with a retryable `409` instead of silently
+losing a line.
 
 ---
 

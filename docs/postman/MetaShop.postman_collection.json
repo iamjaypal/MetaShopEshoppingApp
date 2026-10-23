@@ -34,6 +34,10 @@
       "value": "http://localhost:8083"
     },
     {
+      "key": "cartUrl",
+      "value": "http://localhost:8084"
+    },
+    {
       "key": "internalToken",
       "value": "MetaShopDevOnlyInternalTokenChangeMe0123456789"
     }
@@ -2106,6 +2110,329 @@
                 }
               },
               "response": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cart Service",
+      "description": "One cart per user, owned by the JWT subject. Every endpoint returns the whole cart after a change. Live prices come from product-service and stock from inventory-service, so a 503 here means 'try again shortly' rather than showing a stale price.",
+      "item": [
+        {
+          "name": "Cart (JWT)",
+          "item": [
+            {
+              "name": "Get my cart",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Add item",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart/items",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart",
+                    "items"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": 1,\n  \"quantity\": 2\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Update item quantity",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart/items/{{itemId}}",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart",
+                    "items",
+                    "{{itemId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quantity\": 3\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Remove item",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart/items/{{itemId}}",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart",
+                    "items",
+                    "{{itemId}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Empty the cart",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Validate cart (pre-checkout)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart/validate",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart",
+                    "validate"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guard rails",
+          "item": [
+            {
+              "name": "Add unknown product -> 404",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart/items",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart",
+                    "items"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": 999999,\n  \"quantity\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Add over the quantity cap -> 422",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart/items",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart",
+                    "items"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": 1,\n  \"quantity\": 25\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Add without token -> 401",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/cart/items",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "cart",
+                    "items"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"productId\": 1,\n  \"quantity\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Internal",
+          "item": [
+            {
+              "name": "Clear a user's cart (order-service)",
+              "request": {
+                "method": "DELETE",
+                "header": [
+                  {
+                    "key": "X-Internal-Token",
+                    "value": "{{internalToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{cartUrl}}/api/v1/internal/cart/{{userId}}",
+                  "host": [
+                    "{{cartUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "internal",
+                    "cart",
+                    "{{userId}}"
+                  ]
+                }
+              }
             }
           ]
         }

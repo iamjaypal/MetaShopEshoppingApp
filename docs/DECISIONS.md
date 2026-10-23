@@ -580,3 +580,108 @@ exactly 20 winners; and that a unit still held cannot be won by anyone until it 
 
 The same 50-way race was also run **over HTTP against the live stack** (50 parallel `curl`s at
 `POST /api/v1/internal/inventory/reserve`): `200 × 1, 409 × 49`, then `available=0, reserved=1`.
+
+---
+
+# Phase 5 — cart-service
+
+## D-057 — cart-service scaffold normalised (D-039 applied)
+The remaining Initializr scaffolds were normalised before any code was written. cart-service:
+`cart-service/metashop/` flattened to `cart-service/`, Java **21**, Spring Boot **4.1.0**, Spring
+Cloud **2025.1.3**, package `com.shopMeta.cart_service`, artifact/name `cart-service`,
+`spring.application.name=cart-service`. Port **8084** (D-026 sequence: gateway 8080, auth 8081,
+product 8082, inventory 8083). Database **`metashop_cart_db`** (the `_db` suffix convention, D-049),
+created with `utf8mb4_unicode_ci` before the first start — Flyway owns the schema and
+`ddl-auto=validate` checks it.
+
+## D-058 — The cart stores the minimum; everything else is live
+`cart_items` holds only `product_id`, `quantity` and `added_price` (the price at add time, kept
+solely to flag "price changed since you added this" in the UI). Name, image, live price and stock
+are fetched from product-service / inventory-service **on every cart render** through their
+`/api/v1/internal/**` endpoints (D-022 / D-050) and merged in memory. Rationale: a cart that shows a
+stale price is misleading, and a snapshot of name/price is exactly what order-service will freeze
+into the order — the freeze belongs to the order, not the cart (spec 10.2).
+
+Consequence: when product-service is unreachable the cart is **not** rendered from stale data — the
+service answers **503** ("try again shortly") instead of inventing prices (spec 19). An honest error
+beats a wrong total.
+
+## D-059 — Cart rules (spec 10.3)
+- One cart per user, created lazily by the first mutation; `GET /api/v1/cart` for a user without a
+  cart returns an **empty cart (200)**, never 404, and creates no row.
+- There is **no guest cart**: the platform has no anonymous identity yet, so every cart endpoint
+  requires a JWT and the owner is the token subject — a request body never carries a user id.
+  `X-User-Id` from the gateway is a convenience, not the source of truth.
+- Lines are addressed by **`itemId`**, not `productId` (the storefront gets both in the response).
+  A line of another user is indistinguishable from a missing one → **404** (no existence leak).
+- `PUT /items/{itemId}` is an **absolute** quantity (1..20); removing is `DELETE`, so 0 is rejected.
+- Caps: `metashop.cart.max-quantity-per-item` (default **20**, mirrored by a `CHECK` in the
+  migration) and `metashop.cart.max-distinct-items` (default **50**, keeps the downstream batch
+  calls small; both are 422).
+- `POST /api/v1/cart/items` validates the **resulting** quantity (existing + added): product must
+  exist and be active (404 / 422), stock must cover the result (409 with `{productId, available}`).
+  Lowering a quantity never re-checks stock.
+- Mutations return the **whole updated cart**, so the Angular page and its badge refresh in one
+  round trip.
+
+## D-060 — `POST /api/v1/cart/validate` (pre-checkout)
+Reports every line that would stop a checkout (`CART_EMPTY`, `PRODUCT_NOT_FOUND`, `PRODUCT_INACTIVE`,
+`OUT_OF_STOCK`, `INSUFFICIENT_STOCK`, `QUANTITY_LIMIT_EXCEEDED`) in one answer, **always 200** — an
+invalid cart is an answer to a question, not an error. The storefront calls it when the checkout
+page opens; order-service repeats the check authoritatively when it reserves stock, because stock
+can move between validate and reserve.
+
+The same rules also render as per-line `warning`s in every cart response (`hasWarnings` /
+`warnings` on the envelope): a line that went out of stock stays visible and is flagged, **not
+silently dropped** — the user must see what they had.
+
+## D-061 — Internal cart API
+`DELETE /api/v1/internal/cart/{userId}` clears a user's cart once their order is confirmed
+(plain JSON, `204`, idempotent — a replayed confirmation is harmless). Guarded by
+`X-Internal-Token` via the same `InternalTokenFilter` as inventory-service (D-050) and **not
+routed** by the gateway (D-041). Deliberately the only internal operation: order-service reads the
+cart through the public JWT API of the buyer's session; only the clearing needs a service call.
+
+## D-062 — Resilience of the downstream calls (spec 5.8 / 5.10)
+- `CatalogClient` is the single place that talks to the other services. Every call is decorated
+  `Retry(CircuitBreaker(call))` — the retry is outermost, so one blip is retried before the breaker
+  counts it; an open breaker fails fast instead of hammering a struggling service.
+- Retry only what is worth retrying: connection errors, timeouts and 5xx. A 4xx is the caller's
+  mistake; repeating it would fail again. Both calls the service makes are idempotent reads, which
+  is what makes retrying safe. Config lives in `metashop.resilience.*` (`ResilienceProperties`),
+  built programmatically in `ResilienceConfig` so the decoration order is explicit and testable —
+  no annotations to misread.
+- The timeout is Feign's (`spring.cloud.openfeign.client.config.default.*`): Resilience4j's
+  `TimeLimiter` only applies to reactive calls and this service is blocking MVC.
+- **No Feign call runs inside a database transaction**: `CartStore` (persistence) is separate from
+  `CartService` (rules), the stored cart is read into the `CartData` record first, and the
+  transaction closes before the catalogue is consulted (spec 5.10).
+
+## D-063 — Concurrent adds are decided by the database
+The unique key on `cart_items (cart_id, product_id)` is the arbiter of an add race: two requests
+adding the same product to a fresh cart both try to insert; exactly one wins, the other catches
+`DataIntegrityViolationException` and retries **once** onto the update branch. The `carts` row
+additionally carries a `@Version` column — two racing mutations of the same cart make the loser
+fail with a retryable `409`. Quantity updates and deletes are conditional statements scoped by
+`cart_id` (`updateQuantity` / `deleteByIdAndCartId`), so a foreign `itemId` simply matches no row.
+
+## D-064 — Gateway route for cart-service
+One route added to `GatewayRoutesConfig` (the table grows per service, D-055):
+
+| Path | Target | Auth |
+|---|---|---|
+| `/api/v1/cart/**` | `lb://cart-service` | `JWT` |
+
+There is no public cart read, so the whole service is JWT. `/api/v1/internal/cart/**` has no route.
+api-gateway is now at **28 tests** (route id + auth metadata assertion added).
+
+## D-065 — cart-service tests
+**39 tests**, all green, against a real MySQL (Flyway + `ddl-auto=validate` in the context test):
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `service/CartServiceTest` | 20 | empty cart render, live prices / `priceChanged`, vanished-product and stock warnings, add validation (unknown 404, inactive 422, caps 422, stock 409), add-race retry, ownership 404, clear idempotency, validate issues |
+| `service/CatalogClientTest` | 5 | batch answers keyed by product id, empty-request short circuit, retry of a transient failure before the breaker counts it, fail-fast of a non-retryable failure, 503 mapping |
+| `controller/CartControllerTest` | 12 | routing, DTO shape (no envelope), validation maps (400), 404 / 409 / 503 envelopes, totals rendering |
+| `controller/InternalCartControllerTest` | 1 | plain 204 delegation |
+| `CartServiceApplicationTests` | 1 | context load (Eureka off) |
