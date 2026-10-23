@@ -1,12 +1,17 @@
 package com.shopMeta.auth_service.security;
 
 import com.shopMeta.auth_service.entity.User;
+
 import lombok.RequiredArgsConstructor;
+
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
@@ -19,13 +24,25 @@ public class CustomUserDetails implements UserDetails {
 
         return user.getRoles()
                 .stream()
-                .map(role -> new SimpleGrantedAuthority(role.getName().name()))
+                .map(role -> new SimpleGrantedAuthority("ROLE_" + role.getName().name()))
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Plain role names (CUSTOMER, ADMIN) as used in the JWT {@code roles} claim and the
+     * {@code X-User-Roles} gateway header.
+     */
+    public Set<String> getRoleNames() {
+
+        return user.getRoles()
+                .stream()
+                .map(role -> role.getName().name())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @Override
     public String getPassword() {
-        return user.getPassword();
+        return user.getPasswordHash();
     }
 
     @Override
@@ -40,7 +57,8 @@ public class CustomUserDetails implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return true;
+        return user.getLockedUntil() == null
+                || user.getLockedUntil().isBefore(LocalDateTime.now());
     }
 
     @Override

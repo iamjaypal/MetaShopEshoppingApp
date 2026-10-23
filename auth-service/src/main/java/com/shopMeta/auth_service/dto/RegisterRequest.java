@@ -1,5 +1,7 @@
 package com.shopMeta.auth_service.dto;
 
+import com.shopMeta.auth_service.util.PasswordPolicy;
+
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -12,21 +14,22 @@ import lombok.Setter;
 public class RegisterRequest {
 
     @NotBlank(message = "First name is required")
-    @Size(max = 50, message = "First name cannot exceed 50 characters")
+    @Size(max = 80, message = "First name cannot exceed 80 characters")
     private String firstName;
 
     @NotBlank(message = "Last name is required")
-    @Size(max = 50, message = "Last name cannot exceed 50 characters")
+    @Size(max = 80, message = "Last name cannot exceed 80 characters")
     private String lastName;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Please provide a valid email address")
+    @Size(max = 150, message = "Email cannot exceed 150 characters")
     private String email;
 
-    @NotBlank(message = "Password is required")
-    @Size(min = 8, max = 100, message = "Password must be between 8 and 100 characters")
-    private String password;
-
     @Pattern(regexp = "^\\+[1-9]\\d{7,14}$", message = "Phone number must be in international format, e.g. +919876543210")
-    private String phoneNumber;
+    private String phone;
+
+    @NotBlank(message = "Password is required")
+    @Pattern(regexp = PasswordPolicy.REGEX, message = PasswordPolicy.MESSAGE)
+    private String password;
 }

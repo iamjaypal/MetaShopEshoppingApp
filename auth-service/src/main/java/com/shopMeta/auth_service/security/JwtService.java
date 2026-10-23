@@ -1,67 +1,116 @@
 package com.shopMeta.auth_service.security;
 
+import com.shopMeta.auth_service.config.JwtProperties;
+
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+
+import com.shopMeta.auth_service.util.SecureTokens;
+
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.Date;
+import java.util.List;
+import java.util.UUID;
 
+/**
+ * Issues and validates JWTs (spec 7.4). Access tokens carry {@code sub} (userId),
+ * {@code email}, {@code roles}, {@code iat}, {@code exp} and {@code jti}.
+ */
 @Service
 public class JwtService {
 
-    private final String secretKey = "MetaShopSecretKeyForJwtAuthentication8696402939";
+    private final JwtProperties properties;
+    private final SecretKey signingKey;
 
-    private final long expirationTime = 1000 * 60 * 60; // 1 hour
-
-    private SecretKey getSigningKey() {
-
-        return Keys.hmacShaKeyFor(
-                secretKey.getBytes(StandardCharsets.UTF_8));
+    public JwtService(JwtProperties properties) {
+        this.properties = properties;
+        this.signingKey = Keys.hmacShaKeyFor(properties.getSecret().getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateToken(UserDetails userDetails) {
+    /**
+     * Builds a signed access token for the given principal.
+     */
+    public String generateAccessToken(UserDetails userDetails) {
+
+        Instant issuedAt = Instant.now();
+        Instant expiresAt = issuedAt.plus(properties.getAccessTokenTtl());
 
         return Jwts.builder()
-                .subject(userDetails.getUsername())
-                .issuedAt(new Date())
-                .expiration(
-                        new Date(System.currentTimeMillis() + expirationTime))
-                .signWith(getSigningKey())
+                .subject(resolveUserId(userDetails))
+                .claim("email", userDetails.getUsername())
+                .claim("roles", resolveRoles(userDetails))
+                .id(UUID.randomUUID().toString())
+                .issuer(properties.getIssuer())
+                .issuedAt(Date.from(issuedAt))
+                .expiration(Date.from(expiresAt))
+                .signWith(signingKey)
                 .compact();
     }
 
+    /**
+     * Generates an opaque, cryptographically random refresh-token value. Only its hash is stored.
+     */
+    public String generateRefreshTokenValue() {
+        return SecureTokens.randomToken();
+    }
+
     public String extractUsername(String token) {
+        return parseClaims(token).get("email", String.class);
+    }
 
+    public String extractUserId(String token) {
+        return parseClaims(token).getSubject();
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+
+        Claims claims = parseClaims(token);
+
+        return claims.get("email", String.class).equals(userDetails.getUsername())
+                && claims.getExpiration().after(new Date());
+    }
+
+    public long getAccessTokenTtlSeconds() {
+        return properties.getAccessTokenTtl().toSeconds();
+    }
+
+    private Claims parseClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
-                .getPayload()
-                .getSubject();
+                .getPayload();
     }
 
-    public boolean isTokenValid(
-            String token,
-            UserDetails userDetails) {
+    private String resolveUserId(UserDetails userDetails) {
 
-        String username = extractUsername(token);
+        if (userDetails instanceof CustomUserDetails customUserDetails
+                && customUserDetails.getUser() != null) {
+            return String.valueOf(customUserDetails.getUser().getId());
+        }
 
-        return username.equals(userDetails.getUsername())
-                && !isTokenExpired(token);
+        return userDetails.getUsername();
     }
 
-    private boolean isTokenExpired(String token) {
+    /**
+     * The JWT {@code roles} claim carries plain role names (CUSTOMER, ADMIN), not the
+     * {@code ROLE_}-prefixed Spring authorities.
+     */
+    private List<String> resolveRoles(UserDetails userDetails) {
 
-        Date expiration = Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload()
-                .getExpiration();
+        if (userDetails instanceof CustomUserDetails customUserDetails) {
+            return List.copyOf(customUserDetails.getRoleNames());
+        }
 
-        return expiration.before(new Date());
+        return userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .toList();
     }
 }

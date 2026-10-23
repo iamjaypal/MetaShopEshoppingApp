@@ -8,6 +8,7 @@ import lombok.Setter;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -18,23 +19,37 @@ public class ProductResponse {
 
     private Long id;
 
+    private String sku;
+
     private String name;
+
+    private String slug;
+
+    private String shortDescription;
 
     private String description;
 
-    private String sku;
-
     private BigDecimal price;
 
-    private Integer stockQuantity;
+    private BigDecimal mrp;
 
-    private String category;
+    private String currency;
 
-    private String brand;
+    private Long categoryId;
+    private String categoryName;
 
-    private String imageUrl;
+    private Long brandId;
+    private String brandName;
 
     private Boolean active;
+
+    private BigDecimal averageRating;
+
+    private Integer ratingCount;
+
+    private List<ProductImageResponse> images;
+
+    private List<ProductAttributeResponse> attributes;
 
     private LocalDateTime createdAt;
 

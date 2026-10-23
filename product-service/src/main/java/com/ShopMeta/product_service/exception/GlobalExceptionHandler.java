@@ -3,6 +3,8 @@ package com.ShopMeta.product_service.exception;
 import java.util.HashMap;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -14,19 +16,58 @@ import com.ShopMeta.product_service.dto.ApiResponse;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(ProductNotFoundException.class)
-    public ResponseEntity<ApiResponse<Object>> handleProductNotFoundException(
-            ProductNotFoundException exception) {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
-        ApiResponse<Object> response = ApiResponse.<Object>builder()
-                .success(false)
-                .message(exception.getMessage())
-                .data(null)
-                .build();
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiResponse<Object>> handleResourceNotFoundException(
+            ResourceNotFoundException exception) {
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(response);
+                .body(ApiResponse.builder()
+                        .success(false)
+                        .message(exception.getMessage())
+                        .data(null)
+                        .build());
+    }
+
+    @ExceptionHandler(DuplicateResourceException.class)
+    public ResponseEntity<ApiResponse<Object>> handleDuplicateResourceException(
+            DuplicateResourceException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.builder()
+                        .success(false)
+                        .message(exception.getMessage())
+                        .data(null)
+                        .build());
+    }
+
+    @ExceptionHandler(BusinessRuleException.class)
+    public ResponseEntity<ApiResponse<Object>> handleBusinessRuleException(
+            BusinessRuleException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(ApiResponse.builder()
+                        .success(false)
+                        .message(exception.getMessage())
+                        .data(null)
+                        .build());
+    }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ApiResponse<Object>> handleInvalidRequestException(
+            InvalidRequestException exception) {
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.builder()
+                        .success(false)
+                        .message(exception.getMessage())
+                        .data(null)
+                        .build());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -41,14 +82,26 @@ public class GlobalExceptionHandler {
                         error.getField(),
                         error.getDefaultMessage()));
 
-        ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
-                .success(false)
-                .message("Validation failed")
-                .data(errors)
-                .build();
-
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST)
-                .body(response);
+                .body(ApiResponse.<Map<String, String>>builder()
+                        .success(false)
+                        .message("Validation failed")
+                        .data(errors)
+                        .build());
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ApiResponse<Object>> handleUnexpectedException(Exception exception) {
+
+        log.error("Unexpected error", exception);
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.builder()
+                        .success(false)
+                        .message("An unexpected error occurred")
+                        .data(null)
+                        .build());
     }
 }
