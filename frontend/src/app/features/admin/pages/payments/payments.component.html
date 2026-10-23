@@ -1,0 +1,59 @@
+<div class="admin-page">
+  <div class="admin-head">
+    <div>
+      <h1>Payments</h1>
+      <p>{{ totalElements() }} attempts in the ledger — declined ones stay visible.</p>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="admin-table-wrap">
+      <div class="pay-skel">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <app-skeleton height="46px" width="100%" radius="10px" />
+        }
+      </div>
+    </div>
+  } @else if (loadError(); as error) {
+    <div class="admin-table-wrap"><p class="admin-empty">{{ error }}</p></div>
+  } @else if (!payments().length) {
+    <div class="admin-table-wrap"><p class="admin-empty">No payments yet.</p></div>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Payment</th><th>Order</th><th>Method</th><th>Status</th>
+            <th>Amount</th><th>Updated</th></tr>
+        </thead>
+        <tbody>
+          @for (payment of payments(); track payment.id) {
+            <tr>
+              <td class="admin-table__strong">#{{ payment.id }}</td>
+              <td>#{{ payment.orderId }}</td>
+              <td>{{ payment.method }}</td>
+              <td>
+                <span class="admin-chip"
+                      [class]="'admin-chip--' + payment.status.toLowerCase()">
+                  {{ payment.status }}
+                </span>
+              </td>
+              <td class="admin-table__strong">{{ payment.amount | currency: 'INR' : 'symbol' }}</td>
+              <td>{{ payment.updatedAt | date: 'd MMM y, h:mm a' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1) {
+      <div class="admin-pager">
+        <span class="admin-pager-label">Page {{ page() + 1 }} of {{ totalPages() }}</span>
+        <button class="btn btn--outline btn--sm" type="button" [disabled]="page() === 0"
+                (click)="goToPage(page() - 1)">Previous</button>
+        <button class="btn btn--outline btn--sm" type="button"
+                [disabled]="page() >= totalPages() - 1"
+                (click)="goToPage(page() + 1)">Next</button>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,155 @@
+<div class="orders page">
+  <div class="container">
+
+    <header class="orders__head">
+      <h1>Your orders</h1>
+      @if (!loading() && !loadError() && totalElements() > 0) {
+        <p class="orders__sub">{{ totalElements() }} order{{ totalElements() === 1 ? '' : 's' }}, newest first</p>
+      }
+    </header>
+
+    <!-- ==================== loading ==================== -->
+    @if (loading()) {
+      <div class="orders__list">
+        @for (i of [1, 2]; track i) {
+          <div class="orders__card">
+            <div class="orders__card-head">
+              <app-skeleton height="17px" width="130px" />
+              <app-skeleton height="17px" width="90px" />
+            </div>
+            @for (j of [1, 2]; track j) {
+              <div class="orders__skel-item">
+                <app-skeleton height="48px" width="54px" radius="10px" />
+                <app-skeleton height="14px" width="45%" />
+                <app-skeleton height="14px" width="70px" />
+              </div>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    <!-- ==================== error ==================== -->
+    @else if (loadError(); as error) {
+      <div class="orders__state">
+        <div class="banner banner--error">{{ error }}</div>
+        <button class="btn btn--outline" type="button" (click)="load(page())">Try again</button>
+      </div>
+    }
+
+    <!-- ==================== empty ==================== -->
+    @else if (!orders().length) {
+      <div class="orders__state">
+        <div class="orders__empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 8v13H3V8" />
+            <path d="M1 3h22v5H1z" />
+            <path d="M10 12h4" />
+          </svg>
+        </div>
+        <h2>No orders yet</h2>
+        <p>When you place an order it will show up here with its payment status.</p>
+        <a class="btn btn--primary" routerLink="/products">Start shopping</a>
+      </div>
+    }
+
+    <!-- ==================== orders ==================== -->
+    @else {
+      <div class="orders__list">
+        @for (order of orders(); track order.id) {
+          <article class="orders__card">
+            <header class="orders__card-head">
+              <div class="orders__card-id">
+                <h2>Order #{{ order.id }}</h2>
+                <span class="orders__card-date">{{ order.createdAt | date: 'd MMM y, h:mm a' }}</span>
+              </div>
+              <div class="orders__chips">
+                <span class="orders__chip" [class]="'orders__chip--order-' + order.status.toLowerCase()">
+                  {{ order.status }}
+                </span>
+                <span class="orders__chip"
+                      [class]="'orders__chip--pay-' + order.paymentStatus.toLowerCase()">
+                  {{ order.paymentStatus }}
+                </span>
+              </div>
+            </header>
+
+            <ul class="orders__items">
+              @for (item of order.items; track item.id) {
+                <li>
+                  <img [src]="item.imageUrl" [alt]="item.name" loading="lazy"
+                       (error)="$any($event.target).style.visibility = 'hidden'" />
+                  <div class="orders__item-info">
+                    <a [routerLink]="['/products', item.productId]">{{ item.name }}</a>
+                    <span>Qty {{ item.quantity }} ·
+                      {{ item.unitPrice | currency: 'INR' : 'symbol' }} each</span>
+                  </div>
+                  <span class="orders__item-price">
+                    {{ item.lineTotal | currency: 'INR' : 'symbol' }}
+                  </span>
+                </li>
+              }
+            </ul>
+
+            <footer class="orders__card-foot">
+              <p class="orders__address">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
+                {{ order.shippingAddress.fullName }} —
+                {{ order.shippingAddress.city }}, {{ order.shippingAddress.state }}
+                {{ order.shippingAddress.postalCode }}
+              </p>
+
+              <div class="orders__foot-right">
+                <p class="orders__total">
+                  Total <b>{{ order.total | currency: 'INR' : 'symbol' }}</b>
+                </p>
+
+                <div class="orders__actions">
+                  @if (order.status === 'CREATED' && order.paymentStatus === 'PENDING') {
+                    <button class="btn btn--primary btn--sm" type="button" (click)="pay(order)">
+                      Pay now
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  }
+                  @if (order.status === 'CREATED') {
+                    <button class="orders__cancel" type="button" (click)="cancel(order)"
+                            [class.is-armed]="cancelArmedId() === order.id"
+                            [disabled]="cancellingId() === order.id">
+                      @if (cancellingId() === order.id) {
+                        Cancelling…
+                      } @else if (cancelArmedId() === order.id) {
+                        Click again to confirm
+                      } @else {
+                        Cancel order
+                      }
+                    </button>
+                  }
+                </div>
+              </div>
+            </footer>
+          </article>
+        }
+      </div>
+
+      <!-- pagination -->
+      @if (totalPages() > 1) {
+        <nav class="orders__pager" aria-label="Order pages">
+          <button class="btn btn--outline btn--sm" type="button" [disabled]="page() === 0"
+                  (click)="goToPage(page() - 1)">Previous</button>
+          <span class="orders__pager-label">Page {{ page() + 1 }} of {{ totalPages() }}</span>
+          <button class="btn btn--outline btn--sm" type="button"
+                  [disabled]="page() >= totalPages() - 1"
+                  (click)="goToPage(page() + 1)">Next</button>
+        </nav>
+      }
+    }
+  </div>
+</div>

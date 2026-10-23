@@ -1,0 +1,100 @@
+<div class="admin-page">
+  <div class="admin-head">
+    <div>
+      <h1>Inventory</h1>
+      <p>What can actually be sold — set quantities and low-stock thresholds.</p>
+    </div>
+  </div>
+
+  <!-- ==================== stock editor ==================== -->
+  <section class="inv-editor">
+    <h2>Set stock for a product</h2>
+
+    <div class="inv-editor__lookup">
+      <div class="field__control inv-editor__id">
+        <input class="field__input" type="number" min="1" placeholder="Product id"
+               [value]="productId()" (input)="productId.set($any($event.target).value)"
+               (keydown.enter)="loadStock()" />
+      </div>
+      <button class="btn btn--outline" type="button" (click)="loadStock()"
+              [disabled]="lookupLoading()">
+        {{ lookupLoading() ? 'Loading…' : 'Load' }}
+      </button>
+    </div>
+
+    @if (editingNew()) {
+      <p class="inv-editor__new">No stock row for product {{ productId() }} yet —
+        it will be created when you save.</p>
+    }
+
+    @if (editing() || editingNew()) {
+      <div class="inv-editor__form">
+        <label>
+          <span>SKU</span>
+          <input class="field__input" type="text" [disabled]="!editingNew()"
+                 [value]="editingSku()"
+                 (input)="editingSku.set($any($event.target).value)" />
+        </label>
+        <label>
+          <span>Available quantity</span>
+          <input class="field__input" type="number" min="0"
+                 [value]="quantity() ?? 0"
+                 (input)="setQuantity($any($event.target).value)" />
+        </label>
+        <label>
+          <span>Low-stock threshold</span>
+          <input class="field__input" type="number" min="0"
+                 [value]="threshold()"
+                 (input)="setThreshold($any($event.target).value)" />
+        </label>
+        <button class="btn btn--primary" type="button" (click)="saveStock()" [disabled]="saving()">
+          {{ saving() ? 'Saving…' : 'Save stock' }}
+        </button>
+      </div>
+    }
+  </section>
+
+  <!-- ==================== low stock watchlist ==================== -->
+  <h2 class="inv-watch-title">Low stock watchlist</h2>
+
+  @if (loading()) {
+    <div class="admin-table-wrap">
+      <div class="inv-skel">
+        @for (i of [1, 2, 3]; track i) {
+          <app-skeleton height="46px" width="100%" radius="10px" />
+        }
+      </div>
+    </div>
+  } @else if (loadError(); as error) {
+    <div class="admin-table-wrap"><p class="admin-empty">{{ error }}</p></div>
+  } @else if (!lowStock().length) {
+    <div class="admin-table-wrap"><p class="admin-empty">Nothing is below its threshold. 🎉</p></div>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>Product</th><th>SKU</th><th>Available</th><th>Reserved</th>
+            <th>Threshold</th><th>State</th><th></th></tr>
+        </thead>
+        <tbody>
+          @for (stock of lowStock(); track stock.productId) {
+            <tr>
+              <td class="admin-table__strong">#{{ stock.productId }}</td>
+              <td>{{ stock.sku }}</td>
+              <td>{{ stock.availableQuantity }}</td>
+              <td>{{ stock.reservedQuantity }}</td>
+              <td>{{ stock.lowStockThreshold }}</td>
+              <td>
+                <span class="admin-chip"
+                      [class]="stock.inStock ? 'admin-chip--low' : 'admin-chip--cancelled'">
+                  {{ stock.inStock ? 'LOW' : 'OUT' }}
+                </span>
+              </td>
+              <td><button class="inv-fix" type="button" (click)="editRow(stock)">Restock</button></td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

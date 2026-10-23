@@ -24,23 +24,25 @@ gateway live.
 |---|---|---|
 | F1 | Workspace + design system + auth (login, register) + account page | ✅ |
 | F2 | App shell (navbar, footer) + storefront home page on live data | ✅ |
-| F3 | Product listing (filters, sort, search, pagination) + product detail (gallery, stock, add-to-cart) | ✅ this phase |
-| F4 | Cart + checkout | ⬜ |
-| F5 | Orders, payment page, profile/addresses | ⬜ |
-| F6 | Admin console | ⬜ |
+| F3 | Product listing (filters, sort, search, pagination) + product detail (gallery, stock, add-to-cart) | ✅ |
+| F4 | Cart page + checkout (addresses, place order) | ✅ |
+| F5 | Orders history, payment page (mock gateway), profile/addresses | ✅ |
+| F6 | Admin console (dashboard, products, inventory, orders, payments, users) | ✅ this phase |
 
 ## Structure
 
 ```
 src/app/
 ├── core/                     # the app-wide plumbing
-│   ├── models/               # backend DTO mirrors (ApiResponse, ProductSummary, ProductDetail, Cart, …)
-│   ├── services/             # AuthService, TokenStorage, ProductService, InventoryService, CartService, ToastService
+│   ├── models/               # backend DTO mirrors (ApiResponse, ProductSummary, ProductDetail, Cart, Order, Payment, Address, …)
+│   ├── services/             # AuthService, TokenStorage, ProductService, InventoryService, CartService, AddressService, OrderService, PaymentService, ToastService
 │   ├── interceptors/         # auth.interceptor — Bearer header + error normalising
-│   └── guards/               # authGuard (protected), guestGuard (login/register)
+│   └── guards/               # authGuard, adminGuard (staff only), guestGuard (login/register)
 ├── layout/                   # the storefront shell: navbar (sticky glass, user menu),
-│   └── shell/                # footer; auth pages render outside it
+│   ├── shell/                # footer; auth pages render outside it
+│   └── admin-shell/          # dark sidebar layout for the admin console
 ├── shared/components/        # reusable UI (brand-logo, toast, product-card, skeleton)
+├── shared/validators/        # shared form validators (password policy + match)
 └── features/
     ├── auth/pages/login/     # login  (.ts logic / .html template / .css unique styles)
     ├── auth/pages/register/  # signup
@@ -49,7 +51,16 @@ src/app/
     │                         #           sort, pagination — all in the URL's query params
     ├── products/pages/product-detail/  # gallery, price/MRP, live stock chip, quantity,
     │                         #           add-to-cart, specs, related products
-    ├── account/pages/account/# signed-in profile page
+    ├── cart/pages/cart/      # lines with steppers + remove, stock warnings,
+    │                         #           free-shipping progress, checkout hand-off
+    ├── checkout/pages/checkout/  # address book picker + add-address form, review,
+    │                         #           place order → confirmation panel
+    ├── orders/pages/order-list/  # paged history: status chips, pay/cancel actions
+    ├── orders/pages/payment/ # mock gateway: method picker, capture/decline verdicts
+    ├── account/pages/account/# tabs: profile details, password, address book CRUD
+    └── admin/pages/          # admin console (behind adminGuard): dashboard,
+                              #   products (+ editor drawer, images), inventory,
+                              #   orders, payments ledger, users
     └── misc/pages/coming-soon/  # honest placeholders for routes not built yet
 ```
 

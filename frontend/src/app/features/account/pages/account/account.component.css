@@ -1,91 +1,291 @@
-/* Account page. Shared tokens, cards, badges and banners come from
-   styles.css; the navbar/footer come from the shell. */
+/* The account hub. Shared primitives (fields, buttons, badges, banners,
+   meter, skeleton, form-grid, tokens) come from styles.css. */
 
-.account {
-  width: min(1200px, 100% - 48px);
-  margin-inline: auto;
-  padding-block: 36px 56px;
-  flex: 1;
-}
+.account { padding-bottom: 64px; }
 
+/* ------------------------------------------------------------ header */
 .account__head {
-  margin-bottom: 22px;
-  animation: fade-up .4s ease both;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 36px 0 22px;
+  animation: fade-up .35s ease both;
 }
 
 .account__head h1 {
   font-size: clamp(24px, 3vw, 30px);
   font-weight: 800;
   letter-spacing: -.02em;
-}
-
-.account__head p {
-  margin-top: 5px;
-  color: var(--ink-500);
-  font-size: 14px;
-}
-
-.account__card {
-  width: min(520px, 100%);
-  margin-inline: auto;
-  padding: 40px 36px;
-  text-align: center;
-  animation: fade-up .5s .08s ease both;
+  line-height: 1.2;
 }
 
 .account__avatar {
-  width: 76px;
-  height: 76px;
-  margin: 0 auto 16px;
   display: grid;
   place-items: center;
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
   border-radius: 50%;
   background: var(--grad-brand);
   color: #fff;
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 26px;
+  font-size: 21px;
+  font-weight: 750;
   box-shadow: var(--shadow-brand);
 }
 
-.account__card h2 { font-size: 22px; letter-spacing: -.01em; }
-
-.account__email { color: var(--ink-500); margin-top: 4px; font-size: 14px; }
+.account__email {
+  font-size: 13.5px;
+  color: var(--ink-500);
+  margin-top: 2px;
+}
 
 .account__roles {
   display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-top: 12px;
+  gap: 7px;
+  margin-top: 8px;
 }
 
-.account__facts {
+.account__signout { margin-left: auto; }
+
+.account__sync-note { max-width: 520px; }
+
+/* -------------------------------------------------------------- tabs */
+.account__tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1.5px solid var(--line);
+  margin-bottom: 24px;
+}
+
+.account__tab {
+  padding: 11px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-500);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  position: relative;
+  transition: color .15s ease, background-color .15s ease;
+}
+
+.account__tab:hover { color: var(--ink-900); background: var(--surface-3); }
+
+.account__tab.is-active {
+  color: var(--brand-600);
+  font-weight: 700;
+}
+
+.account__tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1.5px;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--grad-brand);
+  animation: fade-in .2s ease both;
+}
+
+/* ------------------------------------------------------------ panels */
+.account__panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  padding: 26px;
+  animation: fade-up .3s ease both;
+}
+
+.account__panel h2 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 750;
+}
+
+.account__panel-sub {
+  font-size: 13px;
+  color: var(--ink-500);
+  margin: 5px 0 18px;
+}
+
+.account__panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.account__panel-head .account__panel-sub { margin-bottom: 0; }
+
+.account__panel .btn[type='submit'],
+.account__panel button[type='submit'] { margin-top: 4px; }
+
+/* password form is single-column */
+.account__pw-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 460px;
+}
+
+.account__pw-form .meter { margin-top: 8px; }
+
+/* ---------------------------------------------------------- addresses */
+.account__addr-list {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin: 26px 0 0;
-  text-align: center;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin: 18px 0;
 }
 
-.account__facts dt {
+.account__addr {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+
+.account__addr.is-default {
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 3px var(--brand-100);
+}
+
+.account__addr-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-900);
+}
+
+.account__addr-name em {
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--brand-600);
+  background: var(--brand-50);
+  padding: 2.5px 7px;
+  border-radius: var(--radius-full);
+}
+
+.account__addr-lines {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-500);
+}
+
+.account__addr-phone {
   font-size: 12px;
   color: var(--ink-400);
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .04em;
 }
 
-.account__facts dd {
-  margin: 4px 0 0;
+.account__addr-actions {
+  display: flex;
+  gap: 4px;
+  border-top: 1px dashed var(--line);
+  padding-top: 10px;
+  margin-top: auto;
+}
+
+.account__addr-actions button {
+  font-size: 12.5px;
   font-weight: 600;
+  color: var(--ink-500);
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  transition: color .14s ease, background-color .14s ease;
+}
+
+.account__addr-actions button:hover { color: var(--brand-600); background: var(--brand-50); }
+
+.account__addr-actions button.is-danger:hover,
+.account__addr-actions button.is-danger.is-armed {
+  color: var(--danger);
+  background: var(--danger-soft);
+}
+
+.account__addr-actions button.is-armed { animation: shake .3s ease; }
+
+/* empty + skeletons */
+.account__addr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 34px 0;
+}
+
+.account__addr-empty p { color: var(--ink-500); font-size: 14px; }
+
+.account__addr-skel {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+  margin: 18px 0;
+}
+
+/* add / edit form */
+.account__addr-form {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px dashed var(--line);
+  animation: fade-up .25s ease both;
+}
+
+.account__addr-form h3 {
+  font-family: var(--font-body);
   font-size: 14px;
-  color: var(--ink-900);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-weight: 700;
+  margin-bottom: 14px;
+}
+
+.account__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  color: var(--ink-700);
+  margin-block: 14px;
+  cursor: pointer;
+}
+
+.account__check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--brand-500);
+}
+
+.account__addr-form-actions {
+  display: flex;
+  gap: 10px;
+}
+
+/* country select arrow */
+.account__country {
+  appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234a4d6a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 13px center;
+}
+
+/* ------------------------------------------------------------ responsive */
+@media (max-width: 760px) {
+  .account__head { flex-wrap: wrap; }
+  .account__signout { margin-left: 0; width: 100%; }
+  .account__addr-list { grid-template-columns: 1fr; }
+  .account__addr-skel { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {
-  .account { width: min(1200px, 100% - 32px); padding-block: 28px 44px; }
-  .account__facts { grid-template-columns: 1fr; gap: 14px; }
-  .account__card { padding: 32px 22px; }
+  .account__head { padding-top: 26px; }
+  .account__panel { padding: 20px; }
+  .account__addr-form-actions { flex-direction: column; }
 }

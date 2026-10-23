@@ -9,6 +9,9 @@ import { AuthService } from '../../../../core/services/auth.service';
 import { ToastService } from '../../../../core/services/toast.service';
 import { ApiError } from '../../../../core/models/api-error';
 import { BrandLogoComponent } from '../../../../shared/components/brand-logo/brand-logo.component';
+import {
+  passwordStrength, passwordsMatch, strongPassword,
+} from '../../../../shared/validators/password.validators';
 
 /**
  * The sign-up page. Creates the account, then routes to the login page with
@@ -57,16 +60,7 @@ export class RegisterComponent {
 
   /** 0–4 password strength score, computed live from the value. */
   strength(): number {
-    const password = this.form.controls.password.value ?? '';
-    if (!password) {
-      return 0;
-    }
-    let score = 0;
-    if (password.length >= 8) score++;
-    if (/[a-z]/.test(password) && /[A-Z]/.test(password)) score++;
-    if (/\d/.test(password)) score++;
-    if (/[^A-Za-z0-9]/.test(password)) score++;
-    return score;
+    return passwordStrength(this.form.controls.password.value);
   }
 
   hasError(control: AbstractControl): boolean {
@@ -123,30 +117,4 @@ export class RegisterComponent {
     this.shake.set(true);
     setTimeout(() => this.shake.set(false), 500);
   }
-}
-
-/** The two password fields must agree. */
-function passwordsMatch(): (group: AbstractControl) => ValidationErrors | null {
-  return group => {
-    const password = group.get('password')?.value;
-    const confirm = group.get('confirmPassword')?.value;
-    return password && confirm && password !== confirm
-      ? { mismatch: true }
-      : null;
-  };
-}
-
-/** 8+ chars with upper, lower and a digit — matches auth-service's policy. */
-function strongPassword(): (control: AbstractControl) => ValidationErrors | null {
-  return control => {
-    const value = String(control.value ?? '');
-    if (!value) {
-      return null; // 'required' covers the empty case
-    }
-    const valid = value.length >= 8
-      && /[a-z]/.test(value)
-      && /[A-Z]/.test(value)
-      && /\d/.test(value);
-    return valid ? null : { weak: true };
-  };
 }

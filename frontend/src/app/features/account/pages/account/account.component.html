@@ -1,46 +1,330 @@
-<div class="account">
+<div class="account page">
+  <div class="container">
 
-  <header class="account__head">
-    <h1>My account</h1>
-    <p>Everything MetaShop knows about you — on one page.</p>
-  </header>
-
-  <section class="card account__card">
-    <div class="account__avatar">{{ initials() }}</div>
-    <h2>{{ user()?.firstName }} {{ user()?.lastName }}</h2>
-    <p class="account__email">{{ user()?.email }}</p>
-
-    <div class="account__roles">
-      @for (role of user()?.roles ?? []; track role) {
-        <span class="badge" [class.badge--success]="role === 'ADMIN'">{{ role }}</span>
-      }
-    </div>
-
-    <dl class="account__facts">
+    <!-- ==================== header ==================== -->
+    <header class="account__head">
+      <div class="account__avatar">{{ initials() }}</div>
       <div>
-        <dt>User id</dt>
-        <dd>#{{ user()?.id }}</dd>
+        <h1>{{ user()?.firstName }} {{ user()?.lastName }}</h1>
+        <p class="account__email">{{ user()?.email }}</p>
+        <div class="account__roles">
+          @for (role of user()?.roles ?? []; track role) {
+            <span class="badge" [class.badge--success]="role === 'ADMIN'">{{ role }}</span>
+          }
+        </div>
       </div>
-      <div>
-        <dt>Phone</dt>
-        <dd>{{ user()?.phone }}</dd>
-      </div>
-      <div>
-        <dt>Email verified</dt>
-        <dd>{{ user()?.emailVerified ? 'Yes' : 'Pending' }}</dd>
-      </div>
-    </dl>
+      <button class="btn btn--outline btn--sm account__signout" type="button"
+              (click)="signOut()" [disabled]="signingOut()">
+        {{ signingOut() ? 'Signing out…' : 'Sign out' }}
+      </button>
+    </header>
 
     @if (refreshFailed()) {
-      <div class="banner banner--error" style="margin-top: 20px">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
-        Could not sync the profile just now — the token and session still work.
+      <div class="banner banner--warn account__sync-note">
+        Could not sync the profile just now — your session still works.
       </div>
     }
-  </section>
+
+    <!-- ==================== tabs ==================== -->
+    <nav class="account__tabs" role="tablist" aria-label="Account sections">
+      <button role="tab" class="account__tab" type="button"
+              [class.is-active]="tab() === 'profile'"
+              [attr.aria-selected]="tab() === 'profile'"
+              (click)="setTab('profile')">Profile</button>
+      <button role="tab" class="account__tab" type="button"
+              [class.is-active]="tab() === 'security'"
+              [attr.aria-selected]="tab() === 'security'"
+              (click)="setTab('security')">Security</button>
+      <button role="tab" class="account__tab" type="button"
+              [class.is-active]="tab() === 'addresses'"
+              [attr.aria-selected]="tab() === 'addresses'"
+              (click)="setTab('addresses')">Addresses</button>
+    </nav>
+
+    <!-- ==================== profile tab ==================== -->
+    @if (tab() === 'profile') {
+      <section class="account__panel" role="tabpanel" aria-label="Profile details">
+        <h2>Profile details</h2>
+        <p class="account__panel-sub">Your name appears in the navbar and on your orders.</p>
+
+        <form (ngSubmit)="saveProfile()" [formGroup]="profileForm" class="form-grid">
+          <div class="field" [class.field--invalid]="hasError(profileForm.controls.firstName)">
+            <label class="field__label" for="firstName">First name</label>
+            <div class="field__control">
+              <input class="field__input" type="text" id="firstName"
+                     formControlName="firstName" placeholder="First name" />
+            </div>
+            @if (hasError(profileForm.controls.firstName)) {
+              <span class="field__error">First name is required.</span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="hasError(profileForm.controls.lastName)">
+            <label class="field__label" for="lastName">Last name</label>
+            <div class="field__control">
+              <input class="field__input" type="text" id="lastName"
+                     formControlName="lastName" placeholder="Last name" />
+            </div>
+            @if (hasError(profileForm.controls.lastName)) {
+              <span class="field__error">Last name is required.</span>
+            }
+          </div>
+
+          <div class="field field--wide" [class.field--invalid]="hasError(profileForm.controls.phone)">
+            <label class="field__label" for="phone">Phone <em>(optional)</em></label>
+            <div class="field__control">
+              <input class="field__input" type="tel" id="phone" formControlName="phone"
+                     placeholder="+919876543210" />
+              <span class="field__hint">International format, e.g. +919876543210.</span>
+            </div>
+            @if (hasError(profileForm.controls.phone)) {
+              <span class="field__error">International format, e.g. +919876543210.</span>
+            }
+          </div>
+        </form>
+
+        <button class="btn btn--primary" type="submit" (click)="saveProfile()"
+                [disabled]="savingProfile()">
+          {{ savingProfile() ? 'Saving…' : 'Save changes' }}
+        </button>
+      </section>
+    }
+
+    <!-- ==================== security tab ==================== -->
+    @if (tab() === 'security') {
+      <section class="account__panel" role="tabpanel" aria-label="Change password">
+        <h2>Change password</h2>
+        <p class="account__panel-sub">8+ characters with upper case, lower case and a digit.</p>
+
+        <form (ngSubmit)="savePassword()" [formGroup]="passwordForm" class="account__pw-form">
+          <div class="field"
+               [class.field--invalid]="hasError(passwordForm.controls.currentPassword)">
+            <label class="field__label" for="currentPassword">Current password</label>
+            <div class="field__control">
+              <input class="field__input" type="password" id="currentPassword"
+                     formControlName="currentPassword" placeholder="••••••••" />
+            </div>
+            @if (hasError(passwordForm.controls.currentPassword)) {
+              <span class="field__error">Your current password is required.</span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="hasError(passwordForm.controls.newPassword)">
+            <label class="field__label" for="newPassword">New password</label>
+            <div class="field__control">
+              <input class="field__input" type="password" id="newPassword"
+                     formControlName="newPassword" placeholder="New password" />
+            </div>
+            @if (hasError(passwordForm.controls.newPassword)) {
+              <span class="field__error">
+                8+ characters with upper case, lower case and a digit.
+              </span>
+            }
+            <div class="meter meter--{{ strength() }}" aria-hidden="true">
+              <span class="meter__bar"></span>
+              <span class="meter__bar"></span>
+              <span class="meter__bar"></span>
+              <span class="meter__bar"></span>
+            </div>
+          </div>
+
+          <div class="field"
+               [class.field--invalid]="passwordForm.controls.confirmPassword.invalid
+                 && (passwordForm.controls.confirmPassword.touched || attemptedSubmit())">
+            <label class="field__label" for="confirmPassword">Confirm new password</label>
+            <div class="field__control">
+              <input class="field__input" type="password" id="confirmPassword"
+                     formControlName="confirmPassword" placeholder="Repeat the new password" />
+            </div>
+            @if (passwordForm.hasError('mismatch')
+              && (passwordForm.controls.confirmPassword.touched || attemptedSubmit())) {
+              <span class="field__error">The two passwords do not match.</span>
+            }
+          </div>
+        </form>
+
+        <button class="btn btn--primary" type="submit" (click)="savePassword()"
+                [disabled]="savingPassword()">
+          {{ savingPassword() ? 'Changing…' : 'Change password' }}
+        </button>
+      </section>
+    }
+
+    <!-- ==================== addresses tab ==================== -->
+    @if (tab() === 'addresses') {
+      <section class="account__panel" role="tabpanel" aria-label="Address book">
+        <div class="account__panel-head">
+          <div>
+            <h2>Address book</h2>
+            <p class="account__panel-sub">Used at checkout — the default is preselected.</p>
+          </div>
+          <button class="btn btn--outline btn--sm" type="button" (click)="startAddAddress()">
+            + Add address
+          </button>
+        </div>
+
+        @if (addressesLoading()) {
+          <div class="account__addr-skel">
+            <app-skeleton height="110px" width="100%" radius="14px" />
+            <app-skeleton height="110px" width="100%" radius="14px" />
+          </div>
+        } @else if (addressesError(); as error) {
+          <div class="banner banner--error">{{ error }}</div>
+          <button class="btn btn--outline btn--sm" type="button" (click)="loadAddresses()">
+            Try again
+          </button>
+        } @else if (!addresses().length && !showAddressForm()) {
+          <div class="account__addr-empty">
+            <p>No saved addresses yet.</p>
+            <button class="btn btn--primary btn--sm" type="button" (click)="startAddAddress()">
+              Add your first address
+            </button>
+          </div>
+        } @else {
+          <div class="account__addr-list">
+            @for (address of addresses(); track address.id) {
+              <article class="account__addr"
+                       [class.is-default]="address.isDefault">
+                <div class="account__addr-body">
+                  <p class="account__addr-name">
+                    {{ address.fullName }}
+                    @if (address.isDefault) {
+                      <em>Default</em>
+                    }
+                  </p>
+                  <p class="account__addr-lines">
+                    {{ address.line1 }}{{ address.line2 ? ', ' + address.line2 : '' }}<br />
+                    {{ address.city }}, {{ address.state }} {{ address.postalCode }},
+                    {{ address.country }}
+                  </p>
+                  <p class="account__addr-phone">{{ address.phone }}</p>
+                </div>
+                <div class="account__addr-actions">
+                  @if (!address.isDefault) {
+                    <button type="button" (click)="makeDefault(address)">Set default</button>
+                  }
+                  <button type="button" (click)="startEditAddress(address)">Edit</button>
+                  <button type="button" class="is-danger" (click)="deleteAddress(address)"
+                          [class.is-armed]="deleteArmedId() === address.id">
+                    {{ deleteArmedId() === address.id ? 'Confirm?' : 'Delete' }}
+                  </button>
+                </div>
+              </article>
+            }
+          </div>
+        }
+
+        <!-- add / edit form -->
+        @if (showAddressForm()) {
+          <form class="account__addr-form" (ngSubmit)="submitAddress()" [formGroup]="addressForm">
+            <h3>{{ editingAddressId() === null ? 'New address' : 'Edit address' }}</h3>
+
+            <div class="form-grid">
+              <div class="field" [class.field--invalid]="hasError(addressForm.controls.fullName)">
+                <label class="field__label" for="addrFullName">Full name</label>
+                <div class="field__control">
+                  <input class="field__input" type="text" id="addrFullName"
+                         formControlName="fullName" placeholder="Recipient name" />
+                </div>
+                @if (hasError(addressForm.controls.fullName)) {
+                  <span class="field__error">Full name is required.</span>
+                }
+              </div>
+
+              <div class="field" [class.field--invalid]="hasError(addressForm.controls.phone)">
+                <label class="field__label" for="addrPhone">Phone</label>
+                <div class="field__control">
+                  <input class="field__input" type="tel" id="addrPhone" formControlName="phone"
+                         placeholder="+919876543210" />
+                </div>
+                @if (hasError(addressForm.controls.phone)) {
+                  <span class="field__error">International format, e.g. +919876543210.</span>
+                }
+              </div>
+
+              <div class="field field--wide" [class.field--invalid]="hasError(addressForm.controls.line1)">
+                <label class="field__label" for="addrLine1">Address line 1</label>
+                <div class="field__control">
+                  <input class="field__input" type="text" id="addrLine1" formControlName="line1"
+                         placeholder="House / flat, street" />
+                </div>
+                @if (hasError(addressForm.controls.line1)) {
+                  <span class="field__error">Address line 1 is required.</span>
+                }
+              </div>
+
+              <div class="field field--wide">
+                <label class="field__label" for="addrLine2">Address line 2 <em>(optional)</em></label>
+                <div class="field__control">
+                  <input class="field__input" type="text" id="addrLine2" formControlName="line2"
+                         placeholder="Landmark, area" />
+                </div>
+              </div>
+
+              <div class="field" [class.field--invalid]="hasError(addressForm.controls.city)">
+                <label class="field__label" for="addrCity">City</label>
+                <div class="field__control">
+                  <input class="field__input" type="text" id="addrCity" formControlName="city"
+                         placeholder="City" />
+                </div>
+                @if (hasError(addressForm.controls.city)) {
+                  <span class="field__error">City is required.</span>
+                }
+              </div>
+
+              <div class="field" [class.field--invalid]="hasError(addressForm.controls.state)">
+                <label class="field__label" for="addrState">State</label>
+                <div class="field__control">
+                  <input class="field__input" type="text" id="addrState" formControlName="state"
+                         placeholder="State" />
+                </div>
+                @if (hasError(addressForm.controls.state)) {
+                  <span class="field__error">State is required.</span>
+                }
+              </div>
+
+              <div class="field"
+                   [class.field--invalid]="hasError(addressForm.controls.postalCode)">
+                <label class="field__label" for="addrPostalCode">PIN code</label>
+                <div class="field__control">
+                  <input class="field__input" type="text" inputmode="numeric" id="addrPostalCode"
+                         formControlName="postalCode" placeholder="6 digits" />
+                </div>
+                @if (hasError(addressForm.controls.postalCode)) {
+                  <span class="field__error">Enter a 5–6 digit PIN code.</span>
+                }
+              </div>
+
+              <div class="field">
+                <label class="field__label" for="addrCountry">Country</label>
+                <div class="field__control">
+                  <select class="field__input account__country" id="addrCountry"
+                          formControlName="country">
+                    @for (country of countries; track country.code) {
+                      <option [value]="country.code">{{ country.label }}</option>
+                    }
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <label class="account__check">
+              <input type="checkbox" formControlName="isDefault" />
+              Set as my default address
+            </label>
+
+            <div class="account__addr-form-actions">
+              <button class="btn btn--primary" type="submit" [disabled]="savingAddress()">
+                {{ savingAddress() ? 'Saving…' : (editingAddressId() === null
+                  ? 'Save address' : 'Update address') }}
+              </button>
+              <button class="btn btn--ghost" type="button" (click)="cancelAddressForm()">
+                Cancel
+              </button>
+            </div>
+          </form>
+        }
+      </section>
+    }
+  </div>
 </div>

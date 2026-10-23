@@ -1,0 +1,272 @@
+<div class="admin-page">
+  <div class="admin-head">
+    <div>
+      <h1>Products</h1>
+      <p>{{ totalElements() }} in the catalogue, including hidden ones.</p>
+    </div>
+    <button class="btn btn--primary" type="button" (click)="startCreate()">+ New product</button>
+  </div>
+
+  <div class="admin-toolbar">
+    <div class="field__control">
+      <input class="field__input admin-search" type="search" placeholder="Search name or SKU…"
+             [value]="searchInput()" (input)="onSearchInput($any($event.target).value)" />
+      <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+    </div>
+    <div class="admin-pills">
+      <button class="admin-pill" type="button" [class.is-active]="activeFilter() === null"
+              (click)="setFilter(null)">All</button>
+      <button class="admin-pill" type="button" [class.is-active]="activeFilter() === true"
+              (click)="setFilter(true)">Active</button>
+      <button class="admin-pill" type="button" [class.is-active]="activeFilter() === false"
+              (click)="setFilter(false)">Hidden</button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="admin-table-wrap">
+      <div class="admin-skel-rows">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <app-skeleton height="54px" width="100%" radius="10px" />
+        }
+      </div>
+    </div>
+  } @else if (loadError(); as error) {
+    <div class="admin-table-wrap"><p class="admin-empty">
+      {{ error }} —
+      <button class="dash__more" type="button" (click)="load(page())">retry</button>
+    </p></div>
+  } @else if (!products().length) {
+    <div class="admin-table-wrap"><p class="admin-empty">No products match.</p></div>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Price</th>
+            <th>Category / brand</th>
+            <th>State</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (product of products(); track product.id) {
+            <tr>
+              <td>
+                <div class="prod-cell">
+                  <img class="prod-cell__img" [src]="product.imageUrl" [alt]="product.name"
+                       loading="lazy" (error)="$any($event.target).style.visibility = 'hidden'" />
+                  <div>
+                    <p class="admin-table__strong prod-cell__name">{{ product.name }}</p>
+                    <p class="prod-cell__sku">{{ product.sku }}</p>
+                  </div>
+                </div>
+              </td>
+              <td>
+                <span class="admin-table__strong">{{ product.price | currency: 'INR' : 'symbol' }}</span>
+                @if (product.mrp > product.price) {
+                  <s class="prod-cell__mrp">{{ product.mrp | currency: 'INR' : 'symbol' }}</s>
+                }
+              </td>
+              <td>{{ product.categoryName }}<br /><span class="prod-cell__brand">{{ product.brandName }}</span></td>
+              <td>
+                <span class="admin-chip"
+                      [class]="product.active ? 'admin-chip--active' : 'admin-chip--inactive'">
+                  {{ product.active ? 'ACTIVE' : 'HIDDEN' }}
+                </span>
+              </td>
+              <td class="prod-cell__actions">
+                <button class="row-btn" type="button" (click)="startEdit(product)">Edit</button>
+                <button class="row-btn" type="button" (click)="toggleActive(product)"
+                        [disabled]="togglingId() === product.id">
+                  {{ product.active ? 'Hide' : 'Show' }}
+                </button>
+                <button class="row-btn row-btn--danger" type="button" (click)="remove(product)"
+                        [class.is-armed]="deletingId() === product.id">
+                  {{ deletingId() === product.id ? 'Confirm?' : 'Delete' }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1) {
+      <div class="admin-pager">
+        <span class="admin-pager-label">Page {{ pageWindow() }} of {{ totalPages() }}</span>
+        <button class="btn btn--outline btn--sm" type="button" [disabled]="page() === 0"
+                (click)="goToPage(page() - 1)">Previous</button>
+        <button class="btn btn--outline btn--sm" type="button"
+                [disabled]="page() >= totalPages() - 1"
+                (click)="goToPage(page() + 1)">Next</button>
+      </div>
+    }
+  }
+</div>
+
+<!-- ==================== editor drawer ==================== -->
+@if (editorOpen()) {
+  <div class="editor">
+    <div class="editor__scrim" (click)="closeEditor()" aria-hidden="true"></div>
+
+    <section class="editor__panel" role="dialog" aria-modal="true"
+             [attr.aria-label]="editingId() === null ? 'New product' : 'Edit product'">
+      <header class="editor__head">
+        <h2>{{ editingId() === null ? 'New product' : 'Edit product #' + editingId() }}</h2>
+        <button class="editor__close" type="button" (click)="closeEditor()" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </header>
+
+      <div class="editor__body">
+        <div class="form-grid">
+          <div class="field field--wide" [class.field--invalid]="hasError(productForm.controls.name)">
+            <label class="field__label" for="pName">Name</label>
+            <div class="field__control">
+              <input class="field__input" type="text" id="pName" formControlName="name"
+                     placeholder="Product name" />
+            </div>
+            @if (hasError(productForm.controls.name)) {
+              <span class="field__error">Name is required.</span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="hasError(productForm.controls.sku)">
+            <label class="field__label" for="pSku">SKU</label>
+            <div class="field__control">
+              <input class="field__input" type="text" id="pSku" formControlName="sku"
+                     placeholder="SKU-1049" />
+            </div>
+            @if (hasError(productForm.controls.sku)) {
+              <span class="field__error">SKU is required.</span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="hasError(productForm.controls.price)">
+            <label class="field__label" for="pPrice">Price (₹)</label>
+            <div class="field__control">
+              <input class="field__input" type="number" min="0" step="0.01" id="pPrice"
+                     formControlName="price" placeholder="4999" />
+            </div>
+            @if (hasError(productForm.controls.price)) {
+              <span class="field__error">A price above zero is required.</span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="hasError(productForm.controls.mrp)">
+            <label class="field__label" for="pMrp">MRP (₹)</label>
+            <div class="field__control">
+              <input class="field__input" type="number" min="0" step="0.01" id="pMrp"
+                     formControlName="mrp" placeholder="5999" />
+            </div>
+            @if (hasError(productForm.controls.mrp)) {
+              <span class="field__error">MRP is required.</span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="hasError(productForm.controls.categoryId)">
+            <label class="field__label" for="pCategory">Category</label>
+            <div class="field__control">
+              <select class="field__input prod-select" id="pCategory" formControlName="categoryId">
+                <option [ngValue]="null" disabled>Choose…</option>
+                @for (category of categories(); track category.id) {
+                  <option [ngValue]="category.id">{{ category.name }}</option>
+                }
+              </select>
+            </div>
+            @if (hasError(productForm.controls.categoryId)) {
+              <span class="field__error">Pick a category.</span>
+            }
+          </div>
+
+          <div class="field" [class.field--invalid]="hasError(productForm.controls.brandId)">
+            <label class="field__label" for="pBrand">Brand</label>
+            <div class="field__control">
+              <select class="field__input prod-select" id="pBrand" formControlName="brandId">
+                <option [ngValue]="null" disabled>Choose…</option>
+                @for (brand of brands(); track brand.id) {
+                  <option [ngValue]="brand.id">{{ brand.name }}</option>
+                }
+              </select>
+            </div>
+            @if (hasError(productForm.controls.brandId)) {
+              <span class="field__error">Pick a brand.</span>
+            }
+          </div>
+
+          <div class="field field--wide">
+            <label class="field__label" for="pShort">Short description</label>
+            <div class="field__control">
+              <input class="field__input" type="text" id="pShort" formControlName="shortDescription"
+                     placeholder="One line for the card" />
+            </div>
+          </div>
+
+          <div class="field field--wide">
+            <label class="field__label" for="pDesc">Description</label>
+            <div class="field__control">
+              <textarea class="field__input prod-textarea" id="pDesc" formControlName="description"
+                        rows="4" placeholder="The full story…"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <label class="prod-active-check">
+          <input type="checkbox" formControlName="active" />
+          Active — visible in the storefront
+        </label>
+
+        <!-- images (existing products only) -->
+        @if (editingId() !== null) {
+          <div class="prod-images">
+            <h3>Images</h3>
+            <div class="prod-images__grid">
+              @for (image of editorImages(); track image.id) {
+                <div class="prod-images__item">
+                  <img [src]="image.url" [alt]="image.altText" />
+                  @if (image.primary) {
+                    <span class="prod-images__primary">Primary</span>
+                  }
+                  <button class="prod-images__del" type="button"
+                          (click)="removeImage(image.id)"
+                          [disabled]="deletingImageId() === image.id" aria-label="Delete image">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                         stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              }
+              <label class="prod-images__add" [class.is-busy]="uploading()">
+                <input type="file" accept="image/*" (change)="uploadImage($event)" />
+                @if (uploading()) {
+                  Uploading…
+                } @else {
+                  + Upload image
+                }
+              </label>
+            </div>
+          </div>
+        } @else {
+          <p class="prod-images-note">Images can be uploaded after the first save.</p>
+        }
+      </div>
+
+      <footer class="editor__foot">
+        <button class="btn btn--ghost" type="button" (click)="closeEditor()">Cancel</button>
+        <button class="btn btn--primary" type="button" (click)="saveProduct()"
+                [disabled]="saving()">
+          {{ saving() ? 'Saving…' : (editingId() === null ? 'Create product' : 'Save changes') }}
+        </button>
+      </footer>
+    </section>
+  </div>
+}

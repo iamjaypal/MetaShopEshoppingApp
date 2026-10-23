@@ -283,6 +283,21 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; }
 .check input:checked + .check__box svg { opacity: 1; transform: scale(1); }
 .check input:focus-visible + .check__box { box-shadow: 0 0 0 4px var(--brand-100); }
 
+/* Multi-column form layout used by feature pages (checkout address form,
+   account forms). Pair with `.field--wide` for a full-row field. */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.form-grid .field--wide { grid-column: 1 / -1; }
+
+@media (max-width: 560px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .form-grid .field--wide { grid-column: auto; }
+}
+
 /* --------------------------------------------------------------- cards -- */
 .card {
   background: var(--surface);
@@ -523,4 +538,205 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; }
 
   .form-row { grid-template-columns: 1fr; gap: 0; }  /* stack the name row */
   .form-row .field + .field { margin-top: 16px; }
+}
+
+/* ========================================================== ADMIN CONSOLE
+   Shared primitives for the admin pages (tables, stat tiles, toolbars,
+   page heads). The admin shell layout lives in its component. */
+
+/* page head with title + optional action */
+.admin-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+  animation: fade-up .3s ease both;
+}
+
+.admin-head h1 {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+.admin-head p {
+  font-size: 13px;
+  color: var(--ink-500);
+  margin-top: 3px;
+}
+
+/* stat tiles */
+.admin-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 26px;
+}
+
+.admin-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-1);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  text-align: left;
+}
+
+.admin-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+  border-color: var(--brand-200);
+}
+
+.admin-tile-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--ink-400);
+}
+
+.admin-tile-value {
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ink-900);
+}
+
+@media (max-width: 900px) { .admin-tiles { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .admin-tiles { grid-template-columns: 1fr; } }
+
+/* toolbar above tables */
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.admin-toolbar .field__control { min-width: 220px; }
+
+.admin-toolbar-spacer { flex: 1; }
+
+/* filter pills */
+.admin-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.admin-pill {
+  padding: 7.5px 14px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-500);
+  transition: border-color .14s ease, color .14s ease, background-color .14s ease;
+}
+
+.admin-pill:hover { border-color: var(--brand-400); color: var(--brand-600); }
+
+.admin-pill.is-active {
+  background: var(--grad-brand);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+
+/* data tables */
+.admin-table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+  box-shadow: var(--shadow-1);
+  animation: fade-up .3s ease both;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  min-width: 640px;
+}
+
+.admin-table th {
+  text-align: left;
+  font-size: 11.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--ink-400);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+.admin-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-700);
+  vertical-align: middle;
+}
+
+.admin-table tbody tr { transition: background-color .12s ease; }
+
+.admin-table tbody tr:hover { background: var(--surface-2); }
+
+.admin-table tbody tr:last-child td { border-bottom: 0; }
+
+.admin-table .admin-table__strong { color: var(--ink-900); font-weight: 650; }
+
+/* status chips (reuses the store chip look) */
+.admin-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  background: var(--surface-3);
+  color: var(--ink-500);
+}
+
+.admin-chip--created { background: #fdf3e2; color: #a05c00; }
+.admin-chip--confirmed { background: #e7f8ef; color: #178a4c; }
+.admin-chip--delivered { background: #e3efff; color: #1d5fd1; }
+.admin-chip--cancelled { background: var(--danger-soft); color: var(--danger); }
+.admin-chip--pending { background: #fdf3e2; color: #a05c00; }
+.admin-chip--paid, .admin-chip--succeeded { background: #e7f8ef; color: #178a4c; }
+.admin-chip--failed { background: var(--danger-soft); color: var(--danger); }
+.admin-chip--active, .admin-chip--enabled { background: #e7f8ef; color: #178a4c; }
+.admin-chip--inactive, .admin-chip--disabled { background: var(--surface-3); color: var(--ink-400); }
+.admin-chip--low { background: var(--danger-soft); color: var(--danger); }
+
+/* pager row under tables */
+.admin-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-pager-label { font-size: 13px; color: var(--ink-500); }
+
+/* table empty / error panels */
+.admin-empty {
+  padding: 46px 20px;
+  text-align: center;
+  color: var(--ink-500);
+  font-size: 14px;
 }

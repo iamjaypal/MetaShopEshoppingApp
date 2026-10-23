@@ -1,0 +1,194 @@
+<div class="pay page">
+  <div class="container pay__narrow">
+
+    <!-- ==================== loading ==================== -->
+    @if (loading()) {
+      <div class="pay__panel">
+        <app-skeleton height="17px" width="35%" />
+        <app-skeleton height="13px" width="55%" />
+        @for (i of [1, 2]; track i) {
+          <app-skeleton height="64px" width="100%" radius="14px" />
+        }
+        <app-skeleton height="52px" width="100%" radius="12px" />
+      </div>
+    }
+
+    <!-- ==================== load error ==================== -->
+    @else if (loadError(); as error) {
+      <div class="pay__state">
+        <div class="banner banner--error">{{ error }}</div>
+        <div class="pay__state-actions">
+          <button class="btn btn--outline" type="button" (click)="backToOrders()">
+            Back to orders
+          </button>
+        </div>
+      </div>
+    }
+
+    <!-- ==================== verdict: captured ==================== -->
+    @else if (payment() && paymentSuccess()) {
+      <section class="pay__verdict" aria-live="polite">
+        <div class="pay__badge pay__badge--success">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        </div>
+        <h1>Payment captured</h1>
+        <p class="pay__verdict-sub">
+          {{ amount() | currency: 'INR' : 'symbol' }} charged via
+          {{ selectedMethod() }} · order
+          <a [routerLink]="['/orders']">#{{ order()!.id }}</a> is now confirmed and will ship to
+          {{ order()!.shippingAddress.fullName }}.
+        </p>
+
+        <div class="pay__receipt">
+          <div class="pay__receipt-row"><span>Payment</span><b>#{{ payment()!.id }}</b></div>
+          <div class="pay__receipt-row"><span>Gateway reference</span>
+            <b>{{ payment()!.gatewayReference || '—' }}</b></div>
+          <div class="pay__receipt-row"><span>Method</span><b>{{ payment()!.method }}</b></div>
+          <div class="pay__receipt-row"><span>Paid at</span>
+            <b>{{ payment()!.updatedAt | date: 'medium' }}</b></div>
+          <div class="pay__receipt-row pay__receipt-row--total">
+            <span>Amount</span><b>{{ payment()!.amount | currency: 'INR' : 'symbol' }}</b>
+          </div>
+        </div>
+
+        <div class="pay__state-actions">
+          <a class="btn btn--primary" routerLink="/products">Continue shopping</a>
+          <a class="btn btn--ghost" routerLink="/orders">View orders</a>
+        </div>
+      </section>
+    }
+
+    <!-- ==================== verdict: declined ==================== -->
+    @else if (payment(); as declinedPayment) {
+      <section class="pay__verdict" aria-live="polite">
+        <div class="pay__badge pay__badge--fail">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </div>
+        <h1>Payment declined</h1>
+        <p class="pay__verdict-sub">
+          {{ declinedPayment.failureReason || 'The gateway declined the charge.' }}
+        </p>
+
+        <div class="banner banner--warn pay__cancel-note">
+          Because the charge failed, order #{{ declinedPayment.orderId }} was cancelled and the
+          reserved stock was released. Nothing was charged — the attempt is kept in the payment
+          ledger.
+        </div>
+
+        <div class="pay__state-actions">
+          <a class="btn btn--primary" routerLink="/products">Browse products</a>
+          <a class="btn btn--ghost" routerLink="/orders">Back to orders</a>
+        </div>
+      </section>
+    }
+
+    <!-- ==================== order states that block paying ==================== -->
+    @else if (order(); as order) {
+      @if (order.paymentStatus === 'PAID' || order.status === 'CONFIRMED') {
+        <div class="pay__state">
+          <div class="pay__badge pay__badge--success">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <h2>Order #{{ order.id }} is already paid</h2>
+          <p>There is nothing left to charge here.</p>
+          <a class="btn btn--outline" routerLink="/orders">Back to orders</a>
+        </div>
+      } @else if (order.status === 'CANCELLED') {
+        <div class="pay__state">
+          <h2>Order #{{ order.id }} was cancelled</h2>
+          <p>Cancelled orders can no longer be paid. Place a new order instead.</p>
+          <a class="btn btn--outline" routerLink="/products">Browse products</a>
+        </div>
+      }
+
+      <!-- ==================== pay form ==================== -->
+      @else {
+        <section class="pay__panel">
+          <header class="pay__head">
+            <h1>Pay for order #{{ order.id }}</h1>
+            <p class="pay__head-sub">
+              Placed {{ order.createdAt | date: 'd MMM y, h:mm a' }} ·
+              {{ order.items.length }} item{{ order.items.length === 1 ? '' : 's' }} ·
+              delivering to {{ order.shippingAddress.city }},
+              {{ order.shippingAddress.state }}
+            </p>
+          </header>
+
+          <!-- method picker -->
+          <h2 class="pay__section-title">Choose a payment method</h2>
+          <div class="pay__methods" role="radiogroup" aria-label="Payment method">
+            @for (method of methods; track method.value) {
+              <button class="pay__method" type="button" role="radio"
+                      [attr.aria-checked]="selectedMethod() === method.value"
+                      [class.is-selected]="selectedMethod() === method.value"
+                      (click)="selectMethod(method.value)">
+                <span class="pay__method-radio" aria-hidden="true"></span>
+                <span class="pay__method-body">
+                  <span class="pay__method-label">{{ method.label }}</span>
+                  <span class="pay__method-hint">{{ method.hint }}</span>
+                </span>
+              </button>
+            }
+          </div>
+
+          <!-- summary -->
+          <div class="pay__summary">
+            @for (item of order.items; track item.id) {
+              <div class="pay__sum-row">
+                <span>{{ item.name }} × {{ item.quantity }}</span>
+                <b>{{ item.lineTotal | currency: 'INR' : 'symbol' }}</b>
+              </div>
+            }
+            <div class="pay__sum-row">
+              <span>Subtotal</span>
+              <b>{{ order.subtotal | currency: 'INR' : 'symbol' }}</b>
+            </div>
+            <div class="pay__sum-row">
+              <span>Shipping</span>
+              <b>
+                @if (order.shippingFee === 0) {
+                  <span class="pay__free">FREE</span>
+                } @else {
+                  {{ order.shippingFee | currency: 'INR' : 'symbol' }}
+                }
+              </b>
+            </div>
+            <div class="pay__sum-row pay__sum-row--total">
+              <span>Amount to pay</span>
+              <b>{{ order.total | currency: 'INR' : 'symbol' }}</b>
+            </div>
+          </div>
+
+          <p class="pay__demo-note">
+            This is a simulated gateway — no real money moves. A captured charge confirms the
+            order; a declined one cancels it.
+          </p>
+
+          <button class="btn btn--primary btn--lg pay__btn" type="button" (click)="pay()"
+                  [disabled]="paying()">
+            @if (paying()) {
+              <span class="pay__spinner"></span> Contacting gateway…
+            } @else {
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              Pay {{ order.total | currency: 'INR' : 'symbol' }}
+            }
+          </button>
+        </section>
+      }
+    }
+  </div>
+</div>

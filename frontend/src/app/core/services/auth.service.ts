@@ -5,7 +5,8 @@ import { Observable, catchError, map, of } from 'rxjs';
 
 import { TokenStorage } from './token-storage.service';
 import { ApiResponse } from '../models/api-response.model';
-import { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse, UserSummary }
+import { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse,
+  UpdateProfileRequest, ChangePasswordRequest, UserSummary }
   from '../models/user.model';
 
 /**
@@ -65,6 +66,22 @@ export class AuthService {
         this.currentUserSignal.set(response.data);
         return response.data;
       }));
+  }
+
+  /** Updates name/phone and republishes the session user. */
+  updateProfile(request: UpdateProfileRequest): Observable<UserSummary> {
+    return this.http.put<ApiResponse<UserSummary>>('/api/v1/users/me', request)
+      .pipe(map(response => {
+        this.storage.saveUser(response.data);
+        this.currentUserSignal.set(response.data);
+        return response.data;
+      }));
+  }
+
+  /** Changes the password (backend verifies the current one). */
+  changePassword(request: ChangePasswordRequest): Observable<void> {
+    return this.http.put<ApiResponse<void>>('/api/v1/users/me/password', request)
+      .pipe(map(() => undefined));
   }
 
   /**

@@ -1,0 +1,102 @@
+<div class="admin-page">
+  <div class="admin-head">
+    <div>
+      <h1>Dashboard</h1>
+      <p>The whole storefront at a glance.</p>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="admin-tiles">
+      @for (i of [1, 2, 3, 4]; track i) {
+        <app-skeleton height="86px" radius="16px" />
+      }
+    </div>
+    <div class="dash__cols">
+      <app-skeleton height="240px" radius="16px" />
+      <app-skeleton height="240px" radius="16px" />
+    </div>
+  } @else {
+    <div class="admin-tiles">
+      <a class="admin-tile" routerLink="/admin/products">
+        <span class="admin-tile-label">Products</span>
+        <span class="admin-tile-value">{{ productCount() }}</span>
+      </a>
+      <a class="admin-tile" routerLink="/admin/orders">
+        <span class="admin-tile-label">Orders</span>
+        <span class="admin-tile-value">{{ orderCount() }}</span>
+      </a>
+      <a class="admin-tile" routerLink="/admin/payments">
+        <span class="admin-tile-label">Payment attempts</span>
+        <span class="admin-tile-value">{{ paymentCount() }}</span>
+      </a>
+      <a class="admin-tile" routerLink="/admin/users">
+        <span class="admin-tile-label">Users</span>
+        <span class="admin-tile-value">{{ userCount() }}</span>
+      </a>
+    </div>
+
+    <div class="dash__cols">
+      <!-- recent orders -->
+      <section class="admin-table-wrap dash__panel" aria-label="Recent orders">
+        <div class="dash__panel-head">
+          <h2>Recent orders</h2>
+          <a class="dash__more" routerLink="/admin/orders">All orders →</a>
+        </div>
+        @if (recentOrders().length) {
+          <table class="admin-table">
+            <thead>
+              <tr><th>Order</th><th>Date</th><th>Status</th><th>Total</th></tr>
+            </thead>
+            <tbody>
+              @for (order of recentOrders(); track order.id) {
+                <tr>
+                  <td class="admin-table__strong">#{{ order.id }}</td>
+                  <td>{{ order.createdAt | date: 'd MMM y' }}</td>
+                  <td>
+                    <span class="admin-chip"
+                          [class]="'admin-chip--' + order.status.toLowerCase()">{{ order.status }}</span>
+                  </td>
+                  <td class="admin-table__strong">{{ order.total | currency: 'INR' : 'symbol' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="admin-empty">No orders yet.</p>
+        }
+      </section>
+
+      <!-- low stock -->
+      <section class="admin-table-wrap dash__panel" aria-label="Low stock">
+        <div class="dash__panel-head">
+          <h2>Low stock</h2>
+          <a class="dash__more" routerLink="/admin/inventory">Inventory →</a>
+        </div>
+        @if (lowStock().length) {
+          <table class="admin-table">
+            <thead>
+              <tr><th>Product</th><th>Available</th><th>Reserved</th><th>State</th></tr>
+            </thead>
+            <tbody>
+              @for (stock of lowStock(); track stock.productId) {
+                <tr>
+                  <td class="admin-table__strong">{{ stock.sku }}</td>
+                  <td>{{ stock.availableQuantity }}</td>
+                  <td>{{ stock.reservedQuantity }}</td>
+                  <td>
+                    <span class="admin-chip" [class.admin-chip--low]="stock.lowStock">
+                      {{ stock.lowStock ? 'LOW' : stock.inStock ? 'OK' : 'OUT' }}
+                    </span>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        } @else {
+          <p class="admin-empty">Nothing is running low. 🎉</p>
+        }
+      </section>
+    </div>
+  }
+</div>

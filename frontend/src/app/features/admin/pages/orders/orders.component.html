@@ -1,0 +1,81 @@
+<div class="admin-page">
+  <div class="admin-head">
+    <div>
+      <h1>Orders</h1>
+      <p>{{ totalElements() }} total{{ filter() ? ' · filtered by ' + filter() : '' }}.</p>
+    </div>
+  </div>
+
+  <div class="admin-toolbar">
+    <div class="admin-pills">
+      @for (status of statusOptions; track status) {
+        <button class="admin-pill" type="button"
+                [class.is-active]="filter() === status"
+                (click)="setFilter(status)">
+          {{ status ?? 'All' }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="admin-table-wrap">
+      <div class="ord-skel">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <app-skeleton height="46px" width="100%" radius="10px" />
+        }
+      </div>
+    </div>
+  } @else if (loadError(); as error) {
+    <div class="admin-table-wrap"><p class="admin-empty">{{ error }}</p></div>
+  } @else if (!orders().length) {
+    <div class="admin-table-wrap"><p class="admin-empty">No orders in this state.</p></div>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr>
+            <th>Order</th><th>Placed</th><th>Items</th><th>Payment</th>
+            <th>Total</th><th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of orders(); track order.id) {
+            <tr>
+              <td class="admin-table__strong">#{{ order.id }}</td>
+              <td>{{ order.createdAt | date: 'd MMM y, h:mm a' }}</td>
+              <td>{{ order.items.length }}</td>
+              <td>
+                <span class="admin-chip"
+                      [class]="'admin-chip--' + order.paymentStatus.toLowerCase()">
+                  {{ order.paymentStatus }}
+                </span>
+              </td>
+              <td class="admin-table__strong">{{ order.total | currency: 'INR' : 'symbol' }}</td>
+              <td>
+                <select class="ord-status" aria-label="Change status"
+                        [disabled]="updatingId() === order.id"
+                        (change)="changeStatus(order, $any($event.target).value)">
+                  @for (status of statusOptions.slice(1); track status) {
+                    <option [value]="status" [selected]="status === order.status">{{ status }}</option>
+                  }
+                </select>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1) {
+      <div class="admin-pager">
+        <span class="admin-pager-label">Page {{ page() + 1 }} of {{ totalPages() }}</span>
+        <button class="btn btn--outline btn--sm" type="button" [disabled]="page() === 0"
+                (click)="goToPage(page() - 1)">Previous</button>
+        <button class="btn btn--outline btn--sm" type="button"
+                [disabled]="page() >= totalPages() - 1"
+                (click)="goToPage(page() + 1)">Next</button>
+      </div>
+    }
+  }
+</div>

@@ -45,3 +45,16 @@ export interface LoginResponse {
   expiresIn: number;
   user: UserSummary;
 }
+
+/** Matches auth-service `UpdateProfileRequest` (name/phone only). */
+export interface UpdateProfileRequest {
+  firstName: string;
+  lastName: string;
+  phone: string;
+}
+
+/** Matches auth-service `ChangePasswordRequest`. */
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}

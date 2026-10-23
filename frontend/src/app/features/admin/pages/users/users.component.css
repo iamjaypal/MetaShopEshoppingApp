@@ -1,0 +1,16 @@
+/* Admin users page. Table primitives come from styles.css. */
+
+.admin-page { animation: fade-up .2s ease both; }
+
+.usr-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.usr-roles { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.usr-actions { text-align: right; }
+
+.usr-actions .row-btn:hover { color: var(--brand-600); background: var(--brand-50); }

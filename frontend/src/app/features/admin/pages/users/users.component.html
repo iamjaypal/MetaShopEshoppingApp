@@ -1,0 +1,68 @@
+<div class="admin-page">
+  <div class="admin-head">
+    <div>
+      <h1>Users</h1>
+      <p>{{ totalElements() }} registered accounts.</p>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="admin-table-wrap">
+      <div class="usr-skel">
+        @for (i of [1, 2, 3, 4]; track i) {
+          <app-skeleton height="46px" width="100%" radius="10px" />
+        }
+      </div>
+    </div>
+  } @else if (loadError(); as error) {
+    <div class="admin-table-wrap"><p class="admin-empty">{{ error }}</p></div>
+  } @else {
+    <div class="admin-table-wrap">
+      <table class="admin-table">
+        <thead>
+          <tr><th>User</th><th>Email</th><th>Roles</th><th>Joined</th><th>State</th><th></th></tr>
+        </thead>
+        <tbody>
+          @for (user of users(); track user.id) {
+            <tr>
+              <td class="admin-table__strong">{{ user.firstName }} {{ user.lastName }}</td>
+              <td>{{ user.email }}</td>
+              <td>
+                <div class="usr-roles">
+                  @for (role of user.roles; track role) {
+                    <span class="admin-chip"
+                          [class.admin-chip--confirmed]="role === 'ADMIN'">{{ role }}</span>
+                  }
+                </div>
+              </td>
+              <td>{{ user.createdAt | date: 'd MMM y' }}</td>
+              <td>
+                <span class="admin-chip"
+                      [class]="user.enabled ? 'admin-chip--enabled' : 'admin-chip--disabled'">
+                  {{ user.enabled ? 'ENABLED' : 'BLOCKED' }}
+                </span>
+              </td>
+              <td class="usr-actions">
+                <button class="row-btn" type="button" (click)="toggleEnabled(user)"
+                        [disabled]="updatingId() === user.id">
+                  {{ user.enabled ? 'Block sign-in' : 'Allow sign-in' }}
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalPages() > 1) {
+      <div class="admin-pager">
+        <span class="admin-pager-label">Page {{ page() + 1 }} of {{ totalPages() }}</span>
+        <button class="btn btn--outline btn--sm" type="button" [disabled]="page() === 0"
+                (click)="goToPage(page() - 1)">Previous</button>
+        <button class="btn btn--outline btn--sm" type="button"
+                [disabled]="page() >= totalPages() - 1"
+                (click)="goToPage(page() + 1)">Next</button>
+      </div>
+    }
+  }
+</div>

@@ -25,6 +25,7 @@ export class NavbarComponent {
   private readonly router = inject(Router);
 
   readonly user = this.auth.currentUser;
+  readonly isAdmin = this.auth.isAdmin;
   readonly cartCount = this.cart.count;
 
   /** Solid + shadow once the page is scrolled past the top. */

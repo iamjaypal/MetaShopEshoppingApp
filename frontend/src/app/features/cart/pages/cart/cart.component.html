@@ -1,0 +1,206 @@
+<div class="cart page">
+  <div class="container">
+
+    <!-- ==================== header ==================== -->
+    <header class="cart__head">
+      <h1>Your cart</h1>
+      @if (cart(); as c) {
+        @if (c.totalItems > 0) {
+          <p class="cart__sub">{{ c.totalItems }} item{{ c.totalItems === 1 ? '' : 's' }} ·
+            {{ c.subtotal | currency: c.currency : 'symbol' }} subtotal</p>
+        }
+      }
+    </header>
+
+    <!-- ==================== loading ==================== -->
+    @if (loading()) {
+      <div class="cart__layout">
+        <div class="cart__lines">
+          @for (i of [1, 2]; track i) {
+            <div class="cart__line cart__line--skel">
+              <app-skeleton height="92px" width="112px" radius="14px" />
+              <div class="cart__skel-body">
+                <app-skeleton height="13px" width="30%" />
+                <app-skeleton height="17px" width="60%" />
+                <app-skeleton height="30px" width="130px" />
+              </div>
+              <app-skeleton height="20px" width="70px" />
+            </div>
+          }
+        </div>
+        <div class="cart__summary">
+          <app-skeleton height="17px" width="40%" />
+          <app-skeleton height="14px" width="80%" />
+          <app-skeleton height="14px" width="70%" />
+          <app-skeleton height="48px" width="100%" radius="12px" />
+        </div>
+      </div>
+    }
+
+    <!-- ==================== error ==================== -->
+    @else if (loadError(); as error) {
+      <div class="cart__state">
+        <div class="banner banner--error">{{ error }}</div>
+        <button class="btn btn--outline" type="button" (click)="load()">Try again</button>
+      </div>
+    }
+
+    <!-- ==================== empty ==================== -->
+    @else if (!cart() || cart()!.items.length === 0) {
+      <div class="cart__state">
+        <div class="cart__empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="9" cy="21" r="1.6" /><circle cx="19" cy="21" r="1.6" />
+            <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+          </svg>
+        </div>
+        <h2>Your cart is empty</h2>
+        <p>Fill it with something good — the catalogue is waiting.</p>
+        <a class="btn btn--primary" routerLink="/products">Start shopping</a>
+      </div>
+    }
+
+    <!-- ==================== cart ==================== -->
+    @else if (cart(); as c) {
+      <div class="cart__layout">
+
+        <!-- lines -->
+        <section class="cart__lines" aria-label="Cart items">
+          @if (c.hasWarnings && c.warnings.length) {
+            <div class="banner banner--warn cart__warnings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86
+                         a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <ul>
+                @for (warning of c.warnings; track warning) {
+                  <li>{{ warning }}</li>
+                }
+              </ul>
+            </div>
+          }
+
+          @for (item of c.items; track item.itemId) {
+            <article class="cart__line"
+                     [class.is-removing]="removingItemId() === item.itemId"
+                     [class.is-pending]="pendingItemId() === item.itemId">
+              <a class="cart__thumb" [routerLink]="['/products', item.productId]"
+                 [attr.aria-label]="item.name">
+                <img [src]="item.imageUrl" [alt]="item.name" loading="lazy"
+                     (error)="$any($event.target).style.display = 'none'" />
+              </a>
+
+              <div class="cart__line-body">
+                <p class="cart__line-sku">SKU {{ item.sku }}</p>
+                <a class="cart__line-name" [routerLink]="['/products', item.productId]">
+                  {{ item.name }}
+                </a>
+
+                @if (!item.inStock || item.availableQuantity < item.quantity) {
+                  <p class="cart__line-stock">
+                    Only {{ item.availableQuantity }} available right now
+                  </p>
+                }
+                @if (item.priceChanged) {
+                  <p class="cart__line-price-note">Price updated since you added this</p>
+                }
+
+                <div class="cart__line-controls">
+                  <div class="cart__qty" aria-label="Quantity">
+                    <button type="button" (click)="changeQuantity(item, -1)"
+                            [disabled]="pendingItemId() === item.itemId || item.quantity <= 1"
+                            aria-label="Decrease quantity">−</button>
+                    <span class="cart__qty-value">{{ item.quantity }}</span>
+                    <button type="button" (click)="changeQuantity(item, 1)"
+                            [disabled]="pendingItemId() === item.itemId
+                              || item.quantity >= maxQuantity(item)"
+                            aria-label="Increase quantity">+</button>
+                  </div>
+
+                  <button class="cart__remove" type="button"
+                          (click)="removeItem(item)"
+                          [disabled]="removingItemId() === item.itemId">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                         stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="3 6 5 6 21 6" />
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4
+                               a2 2 0 0 1 2 2v2" />
+                      <line x1="10" y1="11" x2="10" y2="17" />
+                      <line x1="14" y1="11" x2="14" y2="17" />
+                    </svg>
+                    Remove
+                  </button>
+                </div>
+              </div>
+
+              <p class="cart__line-total">
+                {{ item.lineTotal | currency: c.currency : 'symbol' }}
+                @if (item.quantity > 1) {
+                  <span>{{ item.unitPrice | currency: c.currency : 'symbol' }} each</span>
+                }
+              </p>
+            </article>
+          }
+
+          <button class="cart__clear" type="button" (click)="clearCart()"
+                  [class.is-armed]="clearArmed()" [disabled]="clearing()">
+            {{ clearing() ? 'Emptying…' : clearArmed() ? 'Click again to confirm' : 'Empty cart' }}
+          </button>
+        </section>
+
+        <!-- summary -->
+        <aside class="cart__summary" aria-label="Order summary">
+          <h2>Summary</h2>
+
+          <div class="cart__sum-row">
+            <span>Subtotal</span>
+            <b>{{ c.subtotal | currency: c.currency : 'symbol' }}</b>
+          </div>
+          <div class="cart__sum-row">
+            <span>Shipping</span>
+            <b>
+              @if (hasFreeShipping()) {
+                <span class="cart__free">FREE</span>
+              } @else {
+                {{ shippingFee | currency: c.currency : 'symbol' }}
+              }
+            </b>
+          </div>
+
+          @if (!hasFreeShipping() && c.subtotal > 0) {
+            <div class="cart__ship-progress" role="status">
+              <p>Add {{ amountToFreeShipping() | currency: c.currency : 'symbol' }} more for free shipping</p>
+              <div class="cart__ship-bar">
+                <span class="cart__ship-fill" [style.width.%]="freeShippingProgress()"></span>
+              </div>
+            </div>
+          } @else if (hasFreeShipping()) {
+            <p class="cart__ship-won">🎉 You've unlocked free shipping</p>
+          }
+
+          <div class="cart__sum-row cart__sum-row--total">
+            <span>Estimated total</span>
+            <b>{{ c.subtotal + (hasFreeShipping() ? 0 : shippingFee) | currency: c.currency : 'symbol' }}</b>
+          </div>
+          <p class="cart__sum-note">Final total is calculated at checkout. Cash on delivery is not
+            available in this demo — payment is simulated.</p>
+
+          <button class="btn btn--primary btn--lg cart__checkout-btn" type="button"
+                  (click)="goToCheckout()">
+            Proceed to checkout
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+
+          <a class="cart__continue" routerLink="/products">Continue shopping</a>
+        </aside>
+      </div>
+    }
+  </div>
+</div>

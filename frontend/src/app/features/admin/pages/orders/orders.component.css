@@ -1,0 +1,30 @@
+/* Admin orders page. Table/primitives come from styles.css. */
+
+.admin-page { animation: fade-up .2s ease both; }
+
+.ord-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.ord-status {
+  padding: 7px 30px 7px 12px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-900);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%234a4d6a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  transition: border-color .14s ease;
+}
+
+.ord-status:hover, .ord-status:focus-visible { border-color: var(--brand-400); outline: none; }
+
+.ord-status:disabled { opacity: .55; cursor: wait; }

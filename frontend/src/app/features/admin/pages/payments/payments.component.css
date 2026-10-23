@@ -1,0 +1,10 @@
+/* Admin payments page. Table primitives come from styles.css. */
+
+.admin-page { animation: fade-up .2s ease both; }
+
+.pay-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}

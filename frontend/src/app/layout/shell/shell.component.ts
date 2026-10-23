@@ -1,6 +1,10 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {
+  ChangeDetectionStrategy, Component, effect, inject,
+} from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 
+import { AuthService } from '../../core/services/auth.service';
+import { CartService } from '../../core/services/cart.service';
 import { FooterComponent } from '../footer/footer.component';
 import { NavbarComponent } from '../navbar/navbar.component';
 
@@ -16,4 +20,22 @@ import { NavbarComponent } from '../navbar/navbar.component';
   styleUrl: './shell.component.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ShellComponent {}
+export class ShellComponent {
+
+  private readonly authService = inject(AuthService);
+  private readonly cartService = inject(CartService);
+
+  constructor() {
+    // Keep the cart badge truthful: fetch the server cart when the user is
+    // signed in, zero it when they sign out.
+    effect(() => {
+      if (this.authService.isAuthenticated()) {
+        this.cartService.getCart().subscribe({
+          error: () => this.cartService.reset(),
+        });
+      } else {
+        this.cartService.reset();
+      }
+    });
+  }
+}
