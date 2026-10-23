@@ -1,0 +1,16 @@
+.shell {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* the routed page grows to push the footer to the bottom */
+.shell__main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.shell__main > * {
+  flex: 1;
+}

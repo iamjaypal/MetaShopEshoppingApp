@@ -1,0 +1,41 @@
+<a class="card" [routerLink]="['/products', product().id]" [attr.aria-label]="product().name">
+
+  <div class="card__media">
+    @if (showImage()) {
+      <img class="card__img" [src]="product().imageUrl" [alt]="product().name" loading="lazy"
+           (error)="onImageError()" />
+    } @else {
+      <div class="card__img-fallback">{{ product().brandName.charAt(0) }}</div>
+    }
+
+    @if (discountPercent() > 0) {
+      <span class="card__discount">-{{ discountPercent() }}%</span>
+    }
+
+    <span class="card__category">{{ product().categoryName }}</span>
+  </div>
+
+  <div class="card__body">
+    <p class="card__brand">{{ product().brandName }}</p>
+    <h3 class="card__name">{{ product().name }}</h3>
+
+    <div class="card__rating" [attr.aria-label]="'Rated ' + product().averageRating + ' out of 5'">
+      <span class="card__stars">
+        @for (star of [1, 2, 3, 4, 5]; track star) {
+          <svg viewBox="0 0 24 24" [class.is-on]="star <= filledStars()"
+               fill="currentColor" aria-hidden="true">
+            <path d="M12 2l2.9 6.26L21.5 9.27l-4.75 4.36 1.25 6.62L12 17.1l-6 3.15 1.25-6.62L2.5 9.27l6.6-1.01L12 2z" />
+          </svg>
+        }
+      </span>
+      <span class="card__rating-count">({{ product().ratingCount }})</span>
+    </div>
+
+    <div class="card__pricing">
+      <span class="card__price">{{ product().price | currency: product().currency : 'symbol' }}</span>
+      @if (product().mrp > product().price) {
+        <span class="card__mrp">{{ product().mrp | currency: product().currency : 'symbol' }}</span>
+      }
+    </div>
+  </div>
+</a>

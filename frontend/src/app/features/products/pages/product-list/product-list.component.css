@@ -1,0 +1,286 @@
+/* The product listing. Shared primitives (fields, buttons, banners, product
+   card, skeletons) come from styles.css / their components. */
+
+.listing__head {
+  padding: 36px 0 6px;
+  animation: fade-up .4s ease both;
+}
+
+.listing__head h1 {
+  font-size: clamp(26px, 3.4vw, 34px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+.listing__sub {
+  margin-top: 6px;
+  color: var(--ink-500);
+  font-size: 14.5px;
+}
+
+.listing__sub b { color: var(--ink-900); font-weight: 600; }
+
+/* two-column body: sticky filter rail + results */
+.listing__body {
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  gap: 30px;
+  align-items: start;
+  padding-block: 24px 56px;
+}
+
+/* ------------------------------------------------------------- filters */
+.filters-toggle {
+  display: none;
+  margin-bottom: 14px;
+}
+
+.filters-toggle__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand-500);
+}
+
+.filters {
+  position: sticky;
+  top: 90px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.filters__clear {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger);
+  padding: 6px 10px;
+  margin: -6px 0 0 -10px;
+  border-radius: var(--radius-sm);
+  transition: background-color .15s ease;
+}
+
+.filters__clear:hover { background: var(--danger-soft); }
+
+.filters__title {
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  color: var(--ink-400);
+  margin-bottom: 11px;
+}
+
+.filters__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.filters__option {
+  text-align: left;
+  padding: 7px 11px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-500);
+  transition: background-color .14s ease, color .14s ease;
+}
+
+.filters__option:hover { background: var(--surface-3); color: var(--ink-900); }
+
+.filters__option.is-active {
+  background: var(--brand-50);
+  color: var(--brand-600);
+  font-weight: 600;
+}
+
+.filters__search { padding-left: 40px; }
+
+.filters__price {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filters__price .field__input {
+  padding: 9px 11px;
+  font-size: 13.5px;
+  width: 100%;
+}
+
+.filters__price-dash { color: var(--ink-400); }
+
+.filters__price-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------------- results */
+.results { min-width: 0; }
+
+.results__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.results__count {
+  font-size: 13.5px;
+  color: var(--ink-500);
+}
+
+.results__sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  color: var(--ink-500);
+}
+
+.results__select {
+  padding: 9px 34px 9px 13px;
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink-900);
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234a4d6a' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.results__select:focus {
+  outline: none;
+  border-color: var(--brand-500);
+  box-shadow: 0 0 0 4px var(--brand-100);
+}
+
+.results__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+.results__cell { display: flex; }
+.results__cell > * { flex: 1; }
+
+.results__skel-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 4px 6px;
+}
+
+.results__state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 40px 0;
+}
+
+.results__state .banner { max-width: 440px; }
+
+.results__empty-icon {
+  display: grid;
+  place-items: center;
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--ink-400);
+}
+
+.results__empty-icon svg { width: 30px; height: 30px; }
+
+.results__state h3 { font-size: 18px; }
+
+.results__state p { color: var(--ink-500); font-size: 14px; }
+
+/* ---------------------------------------------------------- pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 34px;
+}
+
+.pagination__page,
+.pagination__nav {
+  display: grid;
+  place-items: center;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 6px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-700);
+  transition: border-color .15s ease, background-color .15s ease, color .15s ease;
+}
+
+.pagination__page:hover:not(.is-current):not(:disabled),
+.pagination__nav:hover:not(:disabled) {
+  border-color: var(--brand-400);
+  color: var(--brand-600);
+}
+
+.pagination__page.is-current {
+  background: var(--grad-brand);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+
+.pagination__nav:disabled { opacity: .4; cursor: not-allowed; }
+
+.pagination__gap { color: var(--ink-400); padding: 0 2px; }
+
+/* ------------------------------------------------------------ responsive */
+@media (max-width: 1020px) {
+  .results__grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 860px) {
+  .listing__body { grid-template-columns: 1fr; }
+
+  .filters-toggle { display: inline-flex; width: fit-content; }
+
+  /* the filter rail becomes a collapsible block under the toggle */
+  .filters {
+    position: static;
+    display: none;
+  }
+
+  .filters--open { display: flex; animation: fade-down .22s ease both; }
+
+  .filters__options { max-height: none; }
+}
+
+@media (max-width: 560px) {
+  .listing__head { padding-top: 26px; }
+  .listing__body { width: min(1200px, 100% - 32px); margin-inline: auto; }
+  .results__grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .results__bar { flex-direction: column; align-items: flex-start; gap: 10px; }
+}

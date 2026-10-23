@@ -1,0 +1,49 @@
+<footer class="footer">
+  <div class="container footer__grid">
+
+    <div class="footer__brand">
+      <app-brand-logo [size]="36" />
+      <p>
+        A modern storefront powered by microservices — real-time stock, reserved
+        carts and payments you can trust.
+      </p>
+      <div class="footer__trust">
+        <span class="footer__trust-item">
+          <!-- shield -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+          </svg>
+          Secure payments
+        </span>
+        <span class="footer__trust-item">
+          <!-- truck -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 3h15v13H1z" /><path d="M16 8h4l3 3v5h-7V8z" />
+            <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+          </svg>
+          Free shipping ₹499+
+        </span>
+      </div>
+    </div>
+
+    @for (column of columns; track column.title) {
+      <nav class="footer__col" [attr.aria-label]="column.title">
+        <h4>{{ column.title }}</h4>
+        @for (link of column.links; track link.label) {
+          @if (link.route === '#') {
+            <span class="footer__link footer__link--static">{{ link.label }}</span>
+          } @else {
+            <a class="footer__link" [routerLink]="link.route">{{ link.label }}</a>
+          }
+        }
+      </nav>
+    }
+  </div>
+
+  <div class="container footer__legal">
+    <p>© {{ year }} MetaShop. Built as a microservices learning platform.</p>
+    <p class="footer__legal-note">Powered by Spring Boot · Angular · MySQL</p>
+  </div>
+</footer>

@@ -1,0 +1,132 @@
+<header class="nav" [class.nav--scrolled]="scrolled()">
+  <div class="nav__inner container">
+
+    <a class="nav__brand" routerLink="/home" (click)="closeMenus()" aria-label="MetaShop home">
+      <app-brand-logo [size]="34" />
+    </a>
+
+    <!-- desktop navigation -->
+    <nav class="nav__links" aria-label="Primary">
+      @for (link of links; track link.route) {
+        <a class="nav__link" [routerLink]="link.route" (click)="closeMenus()">
+          {{ link.label }}
+        </a>
+      }
+    </nav>
+
+    <div class="nav__actions">
+      <!-- cart -->
+      <a class="nav__icon-btn" routerLink="/cart" (click)="closeMenus()" aria-label="Cart">
+        <!-- shopping cart -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="21" r="1.6" />
+          <circle cx="19" cy="21" r="1.6" />
+          <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+        </svg>
+        @if (cartCount() > 0) {
+          <span class="nav__badge">{{ cartCount() }}</span>
+        }
+      </a>
+
+      @if (user(); as currentUser) {
+        <!-- signed in: avatar + dropdown -->
+        <div class="nav__user">
+          <button class="nav__user-btn" type="button" (click)="toggleUserMenu($event)"
+                  [attr.aria-expanded]="userMenuOpen()" aria-haspopup="menu">
+            <span class="nav__avatar">{{ initials() }}</span>
+            <span class="nav__user-name">{{ currentUser.firstName }}</span>
+            <!-- chevron -->
+            <svg class="nav__chevron" [class.is-open]="userMenuOpen()" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+                 stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+
+          @if (userMenuOpen()) {
+            <div class="nav__menu" role="menu">
+              <div class="nav__menu-head">
+                <p class="nav__menu-name">{{ currentUser.firstName }} {{ currentUser.lastName }}</p>
+                <p class="nav__menu-mail">{{ currentUser.email }}</p>
+              </div>
+              <a class="nav__menu-item" routerLink="/account" (click)="closeMenus()" role="menuitem">
+                <!-- user icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                  <circle cx="12" cy="7" r="4" />
+                </svg>
+                My account
+              </a>
+              <button class="nav__menu-item nav__menu-item--danger" type="button"
+                      (click)="signOut()" role="menuitem">
+                <!-- log-out icon -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" y1="12" x2="9" y2="12" />
+                </svg>
+                Sign out
+              </button>
+            </div>
+          }
+        </div>
+      } @else {
+        <!-- signed out -->
+        <a class="btn btn--ghost btn--sm nav__cta" routerLink="/login">Sign in</a>
+        <a class="btn btn--primary btn--sm nav__cta" routerLink="/register">Get started</a>
+      }
+
+      <!-- mobile hamburger -->
+      <button class="nav__icon-btn nav__burger" type="button" (click)="menuOpen.set(!menuOpen())"
+              [attr.aria-expanded]="menuOpen()" aria-label="Menu">
+        @if (menuOpen()) {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+               stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        } @else {
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"
+               stroke-linecap="round">
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        }
+      </button>
+    </div>
+  </div>
+
+  <!-- mobile slide-down panel -->
+  @if (menuOpen()) {
+    <nav class="nav__mobile" aria-label="Mobile">
+      @for (link of links; track link.route) {
+        <a class="nav__mobile-link" [routerLink]="link.route" (click)="closeMenus()">
+          {{ link.label }}
+          <!-- chevron right -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="9 18 15 12 9 6" />
+          </svg>
+        </a>
+      }
+
+      <div class="nav__mobile-foot">
+        @if (user(); as currentUser) {
+          <a class="btn btn--outline btn--block" routerLink="/account" (click)="closeMenus()">
+            My account ({{ currentUser.firstName }})
+          </a>
+          <button class="btn btn--ghost btn--block" type="button" (click)="signOut()">Sign out</button>
+        } @else {
+          <a class="btn btn--outline btn--block" routerLink="/login" (click)="closeMenus()">Sign in</a>
+          <a class="btn btn--primary btn--block" routerLink="/register" (click)="closeMenus()">
+            Get started
+          </a>
+        }
+      </div>
+    </nav>
+  }
+</header>

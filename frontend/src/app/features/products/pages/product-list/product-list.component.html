@@ -1,0 +1,235 @@
+<div class="listing page">
+
+  <!-- ==================== header ==================== -->
+  <header class="listing__head">
+    <div class="container">
+      <h1>Shop all products</h1>
+      <p class="listing__sub">
+        @if (!loading() && !loadError()) {
+          {{ totalElements() }} product{{ totalElements() === 1 ? '' : 's' }}
+          @if (q()) {
+            for “<b>{{ q() }}</b>”
+          }
+          @if (category()) {
+            in <b>{{ categoryLabel() }}</b>
+          }
+          @if (brand()) {
+            by <b>{{ brand() }}</b>
+          }
+        } @else {
+          Browse the whole MetaShop catalogue.
+        }
+      </p>
+    </div>
+  </header>
+
+  <div class="container listing__body">
+
+    <!-- ==================== filter sidebar ==================== -->
+    <button class="filters-toggle btn btn--outline btn--sm" type="button"
+            (click)="toggleFilters()" [attr.aria-expanded]="filtersOpen()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+      </svg>
+      {{ filtersOpen() ? 'Hide filters' : 'Filters' }}
+      @if (hasActiveFilters()) {
+        <span class="filters-toggle__dot"></span>
+      }
+    </button>
+
+    <aside class="filters" [class.filters--open]="filtersOpen()">
+
+      @if (hasActiveFilters()) {
+        <button class="filters__clear" type="button" (click)="clearAllFilters()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+          Clear all filters
+        </button>
+      }
+
+      <!-- search -->
+      <div class="filters__group">
+        <h3 class="filters__title">Search</h3>
+        <div class="field__control">
+          <input class="field__input filters__search" type="search"
+                 placeholder="Search products…" [ngModel]="searchInput()"
+                 (ngModelChange)="onSearchInput($event)" />
+          <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+          </svg>
+        </div>
+      </div>
+
+      <!-- categories -->
+      @if (categories().length) {
+        <div class="filters__group">
+          <h3 class="filters__title">Category</h3>
+          <div class="filters__options">
+            <button class="filters__option" type="button"
+                    [class.is-active]="!category()" (click)="setCategory('')">
+              All categories
+            </button>
+            @for (cat of categories(); track cat.id) {
+              <button class="filters__option" type="button"
+                      [class.is-active]="category() === cat.slug"
+                      (click)="setCategory(cat.slug)">
+                {{ cat.name }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- brands -->
+      @if (brands().length) {
+        <div class="filters__group">
+          <h3 class="filters__title">Brand</h3>
+          <div class="filters__options">
+            <button class="filters__option" type="button"
+                    [class.is-active]="!brand()" (click)="setBrand('')">
+              All brands
+            </button>
+            @for (brandItem of brands(); track brandItem.id) {
+              <button class="filters__option" type="button"
+                      [class.is-active]="brand() === brandItem.name"
+                      (click)="setBrand(brandItem.name)">
+                {{ brandItem.name }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      <!-- price -->
+      <div class="filters__group">
+        <h3 class="filters__title">Price (₹)</h3>
+        <div class="filters__price">
+          <input class="field__input" type="number" min="0" placeholder="Min"
+                 [ngModel]="minPrice()" (ngModelChange)="setMinPrice($event)" />
+          <span class="filters__price-dash">–</span>
+          <input class="field__input" type="number" min="0" placeholder="Max"
+                 [ngModel]="maxPrice()" (ngModelChange)="setMaxPrice($event)" />
+        </div>
+        <div class="filters__price-actions">
+          <button class="btn btn--primary btn--sm" type="button" (click)="applyPrice()">Apply</button>
+          @if (minPrice() !== null || maxPrice() !== null) {
+            <button class="btn btn--ghost btn--sm" type="button" (click)="clearPrice()">Reset</button>
+          }
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== results ==================== -->
+    <section class="results">
+
+      <div class="results__bar">
+        <p class="results__count" aria-live="polite">
+          @if (loading()) {
+            Loading products…
+          } @else if (!loadError()) {
+            Showing page {{ page() + 1 }} of {{ totalPages() }}
+          }
+        </p>
+
+        <label class="results__sort">
+          <span>Sort by</span>
+          <select class="results__select" [ngModel]="sort()"
+                  (ngModelChange)="setSort($event)" aria-label="Sort products">
+            @for (option of sortOptions; track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </label>
+      </div>
+
+      @if (loading()) {
+        <div class="results__grid">
+          @for (i of [1, 2, 3, 4, 5, 6, 7, 8, 9]; track i) {
+            <div class="results__cell">
+              <app-skeleton height="0" [style.padding-top]="'100%'" radius="18px" />
+              <div class="results__skel-lines">
+                <app-skeleton height="11px" width="40%" />
+                <app-skeleton height="14px" width="85%" />
+                <app-skeleton height="17px" width="55%" />
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (loadError(); as error) {
+        <div class="results__state">
+          <div class="banner banner--error">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            {{ error }}
+          </div>
+        </div>
+      } @else if (!products().length) {
+        <div class="results__state">
+          <div class="results__empty-icon">
+            <!-- search icon -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+          <h3>Nothing matches those filters</h3>
+          <p>Try a different search term, or clear a filter or two.</p>
+          <button class="btn btn--outline" type="button" (click)="clearAllFilters()">
+            Clear all filters
+          </button>
+        </div>
+      } @else {
+        <div class="results__grid">
+          @for (product of products(); track product.id; let i = $index) {
+            <div class="results__cell">
+              <app-product-card [product]="product" [style.--d]="((i % 4) * 0.05) + 's'" />
+            </div>
+          }
+        </div>
+
+        <!-- pagination -->
+        @if (totalPages() > 1) {
+          <nav class="pagination" aria-label="Product pages">
+            <button class="pagination__nav" type="button" [disabled]="page() === 0"
+                    (click)="goToPage(page() - 1)" aria-label="Previous page">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="15 18 9 12 15 6" />
+              </svg>
+            </button>
+
+            @for (p of pages(); track p) {
+              @if (p > 0 && pages()[$index - 1] !== undefined && p - pages()[$index - 1] > 1) {
+                <span class="pagination__gap">…</span>
+              }
+              <button class="pagination__page" type="button"
+                      [class.is-current]="p === page()" (click)="goToPage(p)">
+                {{ p + 1 }}
+              </button>
+            }
+
+            <button class="pagination__nav" type="button"
+                    [disabled]="page() >= totalPages() - 1"
+                    (click)="goToPage(page() + 1)" aria-label="Next page">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </button>
+          </nav>
+        }
+      }
+    </section>
+  </div>
+</div>

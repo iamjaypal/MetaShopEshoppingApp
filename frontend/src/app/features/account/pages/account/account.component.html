@@ -1,0 +1,46 @@
+<div class="account">
+
+  <header class="account__head">
+    <h1>My account</h1>
+    <p>Everything MetaShop knows about you — on one page.</p>
+  </header>
+
+  <section class="card account__card">
+    <div class="account__avatar">{{ initials() }}</div>
+    <h2>{{ user()?.firstName }} {{ user()?.lastName }}</h2>
+    <p class="account__email">{{ user()?.email }}</p>
+
+    <div class="account__roles">
+      @for (role of user()?.roles ?? []; track role) {
+        <span class="badge" [class.badge--success]="role === 'ADMIN'">{{ role }}</span>
+      }
+    </div>
+
+    <dl class="account__facts">
+      <div>
+        <dt>User id</dt>
+        <dd>#{{ user()?.id }}</dd>
+      </div>
+      <div>
+        <dt>Phone</dt>
+        <dd>{{ user()?.phone }}</dd>
+      </div>
+      <div>
+        <dt>Email verified</dt>
+        <dd>{{ user()?.emailVerified ? 'Yes' : 'Pending' }}</dd>
+      </div>
+    </dl>
+
+    @if (refreshFailed()) {
+      <div class="banner banner--error" style="margin-top: 20px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        Could not sync the profile just now — the token and session still work.
+      </div>
+    }
+  </section>
+</div>

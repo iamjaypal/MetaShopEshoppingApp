@@ -1,0 +1,45 @@
+/* "Coming in phase X" placeholder. Shared card/banner styles come from
+   styles.css. */
+
+.soon {
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+}
+
+.soon__card {
+  width: min(460px, 100%);
+  padding: 40px 36px;
+  text-align: center;
+  animation: fade-up .45s ease both;
+}
+
+.soon__badge {
+  display: inline-block;
+  padding: 5px 14px;
+  border-radius: var(--radius-full);
+  background: var(--brand-50);
+  color: var(--brand-600);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  margin-bottom: 16px;
+}
+
+.soon__card h1 {
+  font-size: 24px;
+  letter-spacing: -.01em;
+  margin-bottom: 10px;
+}
+
+.soon__card p {
+  color: var(--ink-500);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.soon__actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}

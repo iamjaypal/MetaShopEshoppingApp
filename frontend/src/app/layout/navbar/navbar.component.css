@@ -1,0 +1,219 @@
+/* The sticky glass top bar. */
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgb(255 255 255 / .88);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid transparent;
+  transition: border-color .25s ease, box-shadow .25s ease;
+}
+
+.nav--scrolled {
+  border-bottom-color: var(--line);
+  box-shadow: 0 4px 18px rgb(20 22 43 / .06);
+}
+
+.nav__inner {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  height: 66px;
+}
+
+.nav__brand { text-decoration: none !important; }
+
+/* ---- primary links ---- */
+.nav__links {
+  display: flex;
+  gap: 4px;
+  margin-right: auto;
+}
+
+.nav__link {
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--ink-500);
+  text-decoration: none !important;
+  transition: color .16s ease, background-color .16s ease;
+}
+
+.nav__link:hover { color: var(--ink-900); background: var(--surface-3); }
+
+/* ---- actions ---- */
+.nav__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.nav__icon-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-700);
+  transition: background-color .16s ease, color .16s ease;
+}
+
+.nav__icon-btn:hover { background: var(--surface-3); color: var(--ink-900); }
+
+.nav__icon-btn svg { width: 20px; height: 20px; }
+
+.nav__badge {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  background: var(--grad-brand);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  box-shadow: 0 0 0 2px #fff;
+}
+
+.nav__cta { white-space: nowrap; }
+
+/* ---- user area ---- */
+.nav__user { position: relative; }
+
+.nav__user-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 10px 5px 5px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+.nav__user-btn:hover { border-color: var(--brand-200); box-shadow: var(--shadow-1); }
+
+.nav__avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--grad-brand);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.nav__user-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-900);
+}
+
+.nav__chevron {
+  width: 15px;
+  height: 15px;
+  color: var(--ink-400);
+  transition: transform .2s ease;
+}
+
+.nav__chevron.is-open { transform: rotate(180deg); }
+
+.nav__menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 230px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-3);
+  padding: 6px;
+  animation: fade-down .2s ease both;
+}
+
+.nav__menu-head {
+  padding: 10px 12px 11px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 6px;
+}
+
+.nav__menu-name { font-size: 14px; font-weight: 700; color: var(--ink-900); }
+
+.nav__menu-mail {
+  font-size: 12.5px;
+  color: var(--ink-400);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nav__menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-700);
+  text-decoration: none !important;
+  text-align: left;
+  transition: background-color .15s ease, color .15s ease;
+}
+
+.nav__menu-item:hover { background: var(--surface-2); color: var(--ink-900); }
+
+.nav__menu-item svg { width: 17px; height: 17px; color: var(--ink-400); }
+
+.nav__menu-item--danger:hover { background: var(--danger-soft); color: var(--danger); }
+.nav__menu-item--danger:hover svg { color: var(--danger); }
+
+/* ---- mobile ---- */
+.nav__burger { display: none; }
+
+.nav__mobile {
+  display: none;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+  padding: 10px 20px 20px;
+  animation: fade-down .22s ease both;
+}
+
+.nav__mobile-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 4px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--ink-900);
+  text-decoration: none !important;
+  border-bottom: 1px solid var(--surface-3);
+}
+
+.nav__mobile-link svg { width: 16px; height: 16px; color: var(--ink-400); }
+
+.nav__mobile-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+@media (max-width: 860px) {
+  .nav__links, .nav__cta { display: none; }
+  .nav__burger { display: grid; }
+  .nav__mobile { display: block; }
+  .nav__user-name { display: none; }  /* avatar is enough on small screens */
+}

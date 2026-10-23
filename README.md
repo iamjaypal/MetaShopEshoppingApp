@@ -17,6 +17,7 @@ Foundational choices and deviations are recorded in [`docs/DECISIONS.md`](docs/D
 | **order-service** | **8085** | ✅ complete (see below) |
 | **payment-service** | **8086** | ✅ complete (see below) |
 | notification-service | 8087 | ⬜ not started |
+| **frontend** | **4200** | 🟨 phase F3 (product listing + detail) complete — see `frontend/README.md` |
 
 ## Repository layout
 
@@ -34,7 +35,8 @@ MetaShop/
 ├── cart-service/               # shopping cart        (:8084) — complete
 ├── order-service/              # checkout & orders    (:8085) — complete
 ├── payment-service/            # payment ledger       (:8086) — complete
-└── notification-service/       # notifications        (:8087) — not started
+├── notification-service/       # notifications        (:8087) — not started
+└── frontend/                   # Angular web client   (:4200) — phase F3 (listing + detail)
 ```
 
 > Runtime versions are pinned to what is already in use: **Java 21** and **Spring Boot 4.1.0**
@@ -56,6 +58,7 @@ cd cart-service       && ./mvnw spring-boot:run   # :8084
 cd order-service      && ./mvnw spring-boot:run   # :8085
 cd payment-service    && ./mvnw spring-boot:run   # :8086
 cd api-gateway        && ./mvnw spring-boot:run   # :8080  public entry point (start last)
+cd frontend           && pnpm start               # :4200  web client (any time after the gateway)
 ```
 
 Then:
@@ -758,3 +761,23 @@ Full reference in [`docs/API.md`](docs/API.md). Highlights:
 - Refunds (and the refund-aware cancellation of paid orders on order-service)
 - `PaymentCompletedEvent` publishing (Kafka) — §14, D-019
 - Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
+
+---
+
+## frontend
+
+The web client (spec 2): an **Angular 21** single-page app — standalone components, signals,
+zoneless change detection — talking to the stack through the API gateway (which already allows the
+`http://localhost:4200` origin, D-045).
+
+Built phase by phase (F1 → F6); see **[`frontend/README.md`](frontend/README.md)** for the run
+instructions, the phase plan and the styling rules.
+
+- **F1 — auth loop**: a shared design system (tokens, buttons, form fields, animations in one
+  `styles.css`) plus a split-screen **sign-in** and **sign-up** page (responsive, animated, fully
+  validated) wired to `/api/v1/auth/**` with JWT token storage, an auth interceptor, route guards
+  and toast notifications.
+- **F2 — app shell + home**: a sticky glass **navbar** (user dropdown, cart badge, mobile menu), a
+  **footer**, and the **storefront home page** — animated hero with floating live products, a
+  category strip, a "fresh arrivals" grid served by product-service, and skeleton loading states.
+  Not-yet-built routes (products, cart, orders) point at honest placeholders.

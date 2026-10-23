@@ -1,0 +1,198 @@
+<div class="auth">
+
+  <!-- ==================== left: brand showcase ==================== -->
+  <aside class="auth__brand">
+    <span class="blob blob--1" aria-hidden="true"></span>
+    <span class="blob blob--2" aria-hidden="true"></span>
+
+    <app-brand-logo [size]="40" [light]="true" />
+
+    <div class="auth__features">
+      <div class="feature" style="--d: .15s">
+        <span class="feature__icon">
+          <!-- shopping bag -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <path d="M16 10a4 4 0 0 1-8 0" />
+          </svg>
+        </span>
+        <div>
+          <h3>Everything in one place</h3>
+          <p>Electronics, fashion and more — with real-time stock on every item.</p>
+        </div>
+      </div>
+
+      <div class="feature" style="--d: .3s">
+        <span class="feature__icon">
+          <!-- truck -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 3h15v13H1z" />
+            <path d="M16 8h4l3 3v5h-7V8z" />
+            <circle cx="5.5" cy="18.5" r="2.5" />
+            <circle cx="18.5" cy="18.5" r="2.5" />
+          </svg>
+        </span>
+        <div>
+          <h3>Fast, reserved delivery</h3>
+          <p>Your cart's stock is reserved the moment you check out — no surprises.</p>
+        </div>
+      </div>
+
+      <div class="feature" style="--d: .45s">
+        <span class="feature__icon">
+          <!-- shield -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+            <polyline points="9 12 11 14 15 10" />
+          </svg>
+        </span>
+        <div>
+          <h3>Secure by design</h3>
+          <p>JWT-protected sessions and encrypted payments on every order.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="auth__brand-foot">
+      © 2026 MetaShop — powered by microservices.
+    </p>
+  </aside>
+
+  <!-- ==================== right: sign-in form ==================== -->
+  <main class="auth__panel">
+    <form class="auth__form" [class.u-shake]="shake()" [formGroup]="form" (ngSubmit)="onSubmit()"
+          novalidate>
+
+      <header class="auth__head">
+        <h1>Welcome back</h1>
+        <p>Sign in to pick up right where you left off.</p>
+        <p class="switch-link">
+          New to MetaShop? <a routerLink="/register">Create an account</a>
+        </p>
+      </header>
+
+      @if (formError(); as error) {
+        <div class="banner banner--error" style="margin-bottom: 16px">
+          <!-- alert circle -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          {{ error }}
+        </div>
+      }
+
+      <div class="form-stack">
+        <div class="field" [class.field--invalid]="hasError(form.controls.email)">
+          <label class="field__label" for="email">Email address</label>
+          <div class="field__control">
+            <input class="field__input" type="email" id="email" formControlName="email"
+                   placeholder="you@example.com" autocomplete="email" />
+            <!-- mail icon -->
+            <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="m22 7-10 6L2 7" />
+            </svg>
+          </div>
+          @if (hasError(form.controls.email)) {
+            <span class="field__error">
+              <!-- alert -->
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                   stroke-linecap="round"><circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              @if (form.controls.email.hasError('required')) {
+                Email is required.
+              } @else {
+                Enter a valid email address.
+              }
+            </span>
+          }
+        </div>
+
+        <div class="field" [class.field--invalid]="hasError(form.controls.password)">
+          <label class="field__label" for="password">Password</label>
+          <div class="field__control">
+            <input class="field__input" [type]="showPassword() ? 'text' : 'password'"
+                   id="password" formControlName="password" placeholder="Your password"
+                   autocomplete="current-password" />
+            <!-- lock icon -->
+            <svg class="field__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <button class="field__action" type="button" (click)="togglePassword()"
+                    [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'">
+              @if (showPassword()) {
+                <!-- eye-off -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                  <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                  <line x1="1" y1="1" x2="23" y2="23" />
+                </svg>
+              } @else {
+                <!-- eye -->
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                     stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              }
+            </button>
+          </div>
+          @if (hasError(form.controls.password)) {
+            <span class="field__error">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                   stroke-linecap="round"><circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              Password is required.
+            </span>
+          }
+        </div>
+
+        <button class="btn btn--primary btn--lg btn--block" type="submit"
+                [disabled]="submitting()">
+          @if (submitting()) {
+            <span class="btn__spinner" aria-hidden="true"></span>
+            Signing in…
+          } @else {
+            Sign in
+            <!-- arrow right -->
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          }
+        </button>
+      </div>
+
+      <div class="demo-creds">
+        <!-- key icon -->
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3" />
+        </svg>
+        <span>
+          Demo customer: <code>customer&#64;metashop.com</code> /
+          <code>Customer&#64;12345</code>
+        </span>
+      </div>
+
+      <p class="form-foot">
+        Protected by JWT sessions · the API gateway is your single entry point.
+      </p>
+    </form>
+  </main>
+</div>

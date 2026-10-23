@@ -1,0 +1,321 @@
+<div class="home">
+
+  <!-- ==================== hero ==================== -->
+  <section class="hero">
+    <span class="hero__glow hero__glow--1" aria-hidden="true"></span>
+    <span class="hero__glow hero__glow--2" aria-hidden="true"></span>
+
+    <div class="container hero__inner">
+
+      <div class="hero__copy">
+        <span class="hero__eyebrow">
+          <span class="hero__eyebrow-dot"></span>
+          New season · new drops every week
+        </span>
+
+        <h1 class="hero__title">
+          Everything you love,
+          <span class="hero__title-grad">one shop.</span>
+        </h1>
+
+        <p class="hero__sub">
+          Electronics, fashion, home and more — with real-time stock, carts that
+          hold your items, and checkout that just works.
+        </p>
+
+        <div class="hero__cta">
+          <a class="btn btn--primary btn--lg" routerLink="/products">
+            Shop now
+            <!-- arrow right -->
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </a>
+          <a class="btn btn--light btn--lg" routerLink="/register">Create account</a>
+        </div>
+
+        <div class="hero__trust">
+          <span class="hero__trust-item">
+            <!-- truck -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M1 3h15v13H1z" /><path d="M16 8h4l3 3v5h-7V8z" />
+              <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+            </svg>
+            Free shipping over ₹499
+          </span>
+          <span class="hero__trust-item">
+            <!-- shield check -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <polyline points="9 12 11 14 15 10" />
+            </svg>
+            Secure payments
+          </span>
+          <span class="hero__trust-item">
+            <!-- refresh -->
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                 stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="1 4 1 10 7 10" />
+              <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+            </svg>
+            7-day easy returns
+          </span>
+        </div>
+      </div>
+
+      <!-- floating collage built from live catalogue images -->
+      @if (heroProducts().length) {
+        <div class="hero__collage" aria-hidden="true">
+          @for (product of heroProducts(); track product.id) {
+            <div class="hero__float" [class]="'hero__float--' + $index">
+              <img [src]="product.imageUrl" [alt]="product.name" loading="eager" />
+              <div class="hero__float-meta">
+                <span class="hero__float-name">{{ product.name }}</span>
+                <span class="hero__float-price">{{ product.price | currency: product.currency : 'symbol' : '1.0-0' }}</span>
+              </div>
+            </div>
+          }
+          <span class="hero__spark hero__spark--1">★ 4.8 rated</span>
+          <span class="hero__spark hero__spark--2">30+ brands</span>
+        </div>
+      }
+    </div>
+
+    <!-- wave divider into the light section -->
+    <svg class="hero__wave" viewBox="0 0 1440 70" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0,70 C240,10 480,0 720,25 C960,50 1200,55 1440,20 L1440,70 Z"
+            fill="var(--surface-2)" />
+    </svg>
+  </section>
+
+  <!-- ==================== categories ==================== -->
+  @if (categories().length) {
+    <section class="section container">
+      <div class="section__head">
+        <div>
+          <h2 class="section__title">Shop by category</h2>
+          <p class="section__sub">Four worlds of products, one cart.</p>
+        </div>
+      </div>
+
+      <div class="cats">
+        @for (category of categories(); track category.id; let i = $index) {
+          <a class="cats__tile" [routerLink]="['/products']"
+             [style.--d]="(i * 0.07) + 's'">
+            <span class="cats__icon">
+              @switch (categoryIcon(category.slug)) {
+                @case ('cpu') {
+                  <!-- cpu -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2" />
+                    <rect x="9" y="9" width="6" height="6" />
+                    <line x1="9" y1="1" x2="9" y2="4" /><line x1="15" y1="1" x2="15" y2="4" />
+                    <line x1="9" y1="20" x2="9" y2="23" /><line x1="15" y1="20" x2="15" y2="23" />
+                    <line x1="20" y1="9" x2="23" y2="9" /><line x1="20" y1="14" x2="23" y2="14" />
+                    <line x1="1" y1="9" x2="4" y2="9" /><line x1="1" y1="14" x2="4" y2="14" />
+                  </svg>
+                }
+                @case ('shirt') {
+                  <!-- shirt -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23z" />
+                  </svg>
+                }
+                @case ('home') {
+                  <!-- home -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                }
+                @case ('trophy') {
+                  <!-- trophy -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                    <path d="M4 22h16" />
+                    <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                    <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                    <path d="M18 2H6v7a6 6 0 0 0 12 0V2z" />
+                  </svg>
+                }
+                @default {
+                  <!-- tag -->
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20.59 13.41 13.42 20.59a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
+                    <line x1="7" y1="7" x2="7.01" y2="7" />
+                  </svg>
+                }
+              }
+            </span>
+            <span class="cats__name">{{ category.name }}</span>
+            <span class="cats__count">
+              @if (category.children.length) {
+                {{ category.children.length }} subcategories
+              } @else {
+                Explore
+              }
+            </span>
+          </a>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- ==================== fresh arrivals ==================== -->
+  <section class="section container">
+    <div class="section__head">
+      <div>
+        <h2 class="section__title">Fresh arrivals</h2>
+        <p class="section__sub">Straight from the warehouse floor — newest first.</p>
+      </div>
+      <a class="section__more" routerLink="/products">
+        View all
+        <!-- arrow -->
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </a>
+    </div>
+
+    @if (loading()) {
+      <div class="grid">
+        @for (i of [1, 2, 3, 4, 5, 6, 7, 8]; track i) {
+          <div class="grid__cell">
+            <app-skeleton height="0" [style.padding-top]="'100%'" radius="18px" />
+            <div class="grid__skel-lines">
+              <app-skeleton height="11px" width="40%" />
+              <app-skeleton height="14px" width="85%" />
+              <app-skeleton height="17px" width="55%" />
+            </div>
+          </div>
+        }
+      </div>
+    } @else if (loadError(); as error) {
+      <div class="home__error">
+        <div class="banner banner--error">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          {{ error }}
+        </div>
+        <button class="btn btn--outline" type="button" (click)="retry()">Try again</button>
+      </div>
+    } @else if (!products().length) {
+      <div class="home__error">
+        <div class="banner banner--info">
+          No products in the catalogue yet — an admin can add some from the
+          product service.
+        </div>
+      </div>
+    } @else {
+      <div class="grid">
+        @for (product of products(); track product.id; let i = $index) {
+          <div class="grid__cell">
+            <app-product-card [product]="product" [style.--d]="((i % 4) * 0.06) + 's'" />
+          </div>
+        }
+      </div>
+    }
+  </section>
+
+  <!-- ==================== trust band ==================== -->
+  <section class="section container">
+    <div class="values">
+      <div class="values__item" style="--d: 0s">
+        <span class="values__icon">
+          <!-- truck -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 3h15v13H1z" /><path d="M16 8h4l3 3v5h-7V8z" />
+            <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+          </svg>
+        </span>
+        <div>
+          <h3>Free delivery</h3>
+          <p>On every order above ₹499 — flat ₹49 below it.</p>
+        </div>
+      </div>
+
+      <div class="values__item" style="--d: .08s">
+        <span class="values__icon">
+          <!-- lock -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </span>
+        <div>
+          <h3>Payments you trust</h3>
+          <p>Charges are confirmed by the order service before we sell your item.</p>
+        </div>
+      </div>
+
+      <div class="values__item" style="--d: .16s">
+        <span class="values__icon">
+          <!-- refresh -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="1 4 1 10 7 10" />
+            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+          </svg>
+        </span>
+        <div>
+          <h3>7-day returns</h3>
+          <p>Changed your mind? Cancel any order that hasn't shipped.</p>
+        </div>
+      </div>
+
+      <div class="values__item" style="--d: .24s">
+        <span class="values__icon">
+          <!-- headphones -->
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+          </svg>
+        </span>
+        <div>
+          <h3>Real support</h3>
+          <p>Order questions answered by the people who run the shop.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== CTA band ==================== -->
+  <section class="section container">
+    <div class="cta">
+      <div>
+        <h2 class="cta__title">Ready when you are.</h2>
+        <p class="cta__sub">
+          Create your free account — wishlists, saved addresses and order
+          tracking included.
+        </p>
+      </div>
+      <a class="btn btn--light btn--lg" routerLink="/register">
+        Get started
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12" />
+          <polyline points="12 5 19 12 12 19" />
+        </svg>
+      </a>
+    </div>
+  </section>
+</div>

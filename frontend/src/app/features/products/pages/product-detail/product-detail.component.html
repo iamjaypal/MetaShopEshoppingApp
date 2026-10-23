@@ -1,0 +1,247 @@
+<div class="pdp page">
+  <div class="container">
+
+    <!-- ==================== loading ==================== -->
+    @if (loading()) {
+      <div class="pdp__layout">
+        <app-skeleton height="420px" radius="22px" />
+        <div class="pdp__skel">
+          <app-skeleton height="13px" width="30%" />
+          <app-skeleton height="30px" width="80%" />
+          <app-skeleton height="15px" width="35%" />
+          <app-skeleton height="32px" width="180px" />
+          <app-skeleton height="54px" width="100%" />
+          <app-skeleton height="15px" width="60%" />
+          <app-skeleton height="15px" width="50%" />
+        </div>
+      </div>
+    }
+
+    <!-- ==================== error ==================== -->
+    @else if (loadError(); as error) {
+      <div class="pdp__state">
+        <div class="banner banner--error">{{ error }}</div>
+        <div class="pdp__state-actions">
+          <a class="btn btn--outline" routerLink="/products">Back to products</a>
+        </div>
+      </div>
+    }
+
+    <!-- ==================== product ==================== -->
+    @else if (product(); as p) {
+
+      <!-- breadcrumb -->
+      <nav class="pdp__crumbs" aria-label="Breadcrumb">
+        <a routerLink="/">Home</a>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+        @if (categorySlug(); as slug) {
+          <a [routerLink]="['/products']" [queryParams]="{ category: slug }">
+            {{ p.categoryName }}
+          </a>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+        }
+        <span aria-current="page">{{ p.name }}</span>
+      </nav>
+
+      <div class="pdp__layout">
+
+        <!-- gallery -->
+        <section class="pdp__gallery" aria-label="Product images">
+          <div class="pdp__stage">
+            @if (discountPercent() > 0) {
+              <span class="pdp__discount">-{{ discountPercent() }}%</span>
+            }
+            @for (image of gallery(); track image.id; let i = $index) {
+              @if (i === activeImage()) {
+                <img class="pdp__img" [src]="image.url" [alt]="image.altText || p.name"
+                     [attr.loading]="i === 0 ? 'eager' : 'lazy'" />
+              }
+            }
+          </div>
+
+          @if (gallery().length > 1) {
+            <div class="pdp__thumbs">
+              @for (image of gallery(); track image.id; let i = $index) {
+                <button class="pdp__thumb" type="button"
+                        [class.is-active]="i === activeImage()"
+                        (click)="selectImage(i)"
+                        [attr.aria-label]="'Image ' + (i + 1) + ' of ' + gallery().length">
+                  <img [src]="image.url" [alt]="image.altText || p.name" loading="lazy" />
+                </button>
+              }
+            </div>
+          }
+        </section>
+
+        <!-- info -->
+        <section class="pdp__info">
+          <p class="pdp__brand">{{ p.brandName }}</p>
+          <h1 class="pdp__name">{{ p.name }}</h1>
+
+          <div class="pdp__rating">
+            <span class="pdp__stars" [attr.aria-label]="'Rated ' + p.averageRating + ' out of 5'">
+              @for (star of [1, 2, 3, 4, 5]; track star) {
+                <svg viewBox="0 0 24 24" [class.is-on]="star <= filledStars()"
+                     fill="currentColor" aria-hidden="true">
+                  <path d="M12 2l2.9 6.26L21.5 9.27l-4.75 4.36 1.25 6.62L12 17.1l-6 3.15 1.25-6.62L2.5 9.27l6.6-1.01L12 2z" />
+                </svg>
+              }
+            </span>
+            <span class="pdp__rating-note">
+              {{ p.averageRating || 'New' }}
+              @if (p.ratingCount > 0) {
+                <em>({{ p.ratingCount }} rating{{ p.ratingCount === 1 ? '' : 's' }})</em>
+              }
+            </span>
+          </div>
+
+          <div class="pdp__pricing">
+            <span class="pdp__price">{{ p.price | currency: p.currency : 'symbol' }}</span>
+            @if (p.mrp > p.price) {
+              <span class="pdp__mrp">{{ p.mrp | currency: p.currency : 'symbol' }}</span>
+              <span class="pdp__save">Save {{ discountPercent() }}%</span>
+            }
+          </div>
+
+          <p class="pdp__taxes">Inclusive of all taxes</p>
+
+          @if (p.shortDescription) {
+            <p class="pdp__lead">{{ p.shortDescription }}</p>
+          }
+
+          <!-- stock -->
+          <div class="pdp__stock" [class]="'pdp__stock--' + (stockState() ?? 'checking')"
+               role="status" aria-live="polite">
+            @switch (stockState()) {
+              @case (null) {
+                <span class="pdp__stock-dot"></span> Checking availability…
+              }
+              @case ('in') {
+                <span class="pdp__stock-dot"></span>
+                In stock — {{ stock()!.availableQuantity }} available
+              }
+              @case ('low') {
+                <span class="pdp__stock-dot"></span>
+                Hurry — only {{ stock()!.availableQuantity }} left
+              }
+              @case ('out') {
+                <span class="pdp__stock-dot"></span> Out of stock
+              }
+              @default {
+                <span class="pdp__stock-dot"></span> Availability unknown
+              }
+            }
+          </div>
+
+          <!-- buy row -->
+          <div class="pdp__buy">
+            <div class="pdp__qty" [class.is-disabled]="stockState() === 'out'">
+              <button type="button" (click)="decreaseQuantity()"
+                      [disabled]="quantity() <= 1" aria-label="Decrease quantity">−</button>
+              <span class="pdp__qty-value" aria-live="polite">{{ quantity() }}</span>
+              <button type="button" (click)="increaseQuantity()"
+                      [disabled]="quantity() >= maxQuantity()" aria-label="Increase quantity">+</button>
+            </div>
+
+            <button class="pdp__add btn btn--primary btn--lg" type="button"
+                    (click)="addToCart()"
+                    [disabled]="adding() || stockState() === 'out'">
+              @if (stockState() === 'out') {
+                Out of stock
+              } @else if (justAdded()) {
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Added
+              } @else if (adding()) {
+                <span class="pdp__spinner"></span> Adding…
+              } @else {
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="9" cy="21" r="1.6" /><circle cx="19" cy="21" r="1.6" />
+                  <path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12" />
+                </svg>
+                Add to cart
+              }
+            </button>
+          </div>
+
+          <!-- perks -->
+          <ul class="pdp__perks">
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 3h15v13H1z" /><path d="M16 8h4l3 3v5h-7V8z" />
+                <circle cx="5.5" cy="18.5" r="2.5" /><circle cx="18.5" cy="18.5" r="2.5" />
+              </svg>
+              <div><b>Free delivery</b><span>On orders over ₹499</span></div>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+              </svg>
+              <div><b>7-day returns</b><span>No questions asked</span></div>
+            </li>
+            <li>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                <polyline points="9 12 11 14 15 10" />
+              </svg>
+              <div><b>Secure payments</b><span>Card, UPI &amp; net banking</span></div>
+            </li>
+          </ul>
+        </section>
+      </div>
+
+      <!-- ==================== long description + specs ==================== -->
+      <section class="pdp__details">
+        @if (p.description) {
+          <article class="pdp__panel">
+            <h2>About this product</h2>
+            <p class="pdp__description">{{ p.description }}</p>
+          </article>
+        }
+        @if (p.attributes.length) {
+          <article class="pdp__panel">
+            <h2>Specifications</h2>
+            <dl class="pdp__specs">
+              @for (attribute of p.attributes; track attribute.key) {
+                <div class="pdp__spec">
+                  <dt>{{ attribute.key }}</dt>
+                  <dd>{{ attribute.value }}</dd>
+                </div>
+              }
+            </dl>
+          </article>
+        }
+      </section>
+
+      <!-- ==================== related ==================== -->
+      @if (related().length) {
+        <section class="pdp__related">
+          <div class="pdp__related-head">
+            <h2>You may also like</h2>
+            <a class="pdp__related-more" [routerLink]="['/products']"
+               [queryParams]="{ category: categorySlug() }">
+              More in {{ p.categoryName }}
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </a>
+          </div>
+          <div class="pdp__related-grid">
+            @for (item of related(); track item.id; let i = $index) {
+              <app-product-card [product]="item" [style.--d]="((i % 4) * 0.05) + 's'" />
+            }
+          </div>
+        </section>
+      }
+    }
+  </div>
+</div>
