@@ -14,20 +14,14 @@ import com.ShopMeta.product_service.dto.ProductPageResponse;
 import com.ShopMeta.product_service.dto.ProductResponse;
 import com.ShopMeta.product_service.service.ProductService;
 
-/**
- * Public product catalog endpoints (read-only, no authentication required).
- */
+
 @Tag(name = "Products (public)", description = "Public catalog search, filters and product detail")
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
 public class ProductController {
-
     private final ProductService productService;
 
-    /**
-     * Catalog search / filter / sort / pagination (spec section 8.3).
-     */
     @Operation(summary = "Search / filter / sort / paginate products",
             description = "Only active products. size is clamped to 1..100; sort is whitelisted.")
     @GetMapping
