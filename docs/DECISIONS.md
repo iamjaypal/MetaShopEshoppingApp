@@ -768,3 +768,58 @@ Two routes added to `GatewayRoutesConfig` (the table grows per service, D-055/D-
 | `controller/AdminOrderControllerTest` | 3 | admin list with status filter, ship transition, illegal transition 422 |
 | `controller/InternalOrderControllerTest` | 3 | payment result callbacks, plain JSON (no envelope), 404 mapping |
 | `OrderServiceApplicationTests` | 1 | context load (Eureka off) |
+
+## D-075 — payment-service: a ledger of attempts, amounts taken from the order
+payment-service (`:8086`, `com.shopMeta.payment_service`, schema `metashop_payment_db`) keeps **one
+row per payment attempt**. The client only names the order and the method (`CARD`, `UPI`,
+`WALLET`) — the amount is always the order's frozen total, read from order-service's internal API,
+never from the request body. A decline stays in the ledger as `FAILED`; the retry is a new row.
+Methods run through the same mock gateway today; the enum exists so the ledger and the future
+notification emails can distinguish them. Gateway behaviour is `metashop.payment.gateway-mode`
+(`SUCCESS` default, `FAILURE` to demo the release path, `RANDOM`).
+
+## D-076 — order-service grew the internal read payment-service needs
+`GET /api/v1/internal/orders/{id}` (X-Internal-Token, plain JSON per D-022) returns the full order
+snapshot including the owner id. Payment-service checks ownership and the lifecycle status itself
+(a foreign order is the same `404` as a missing one, ids cannot be probed). order-service is now at
+**59 tests** (controller tests for the read), payment-service's `OrderClient` consumes it.
+
+## D-077 — the payment flow and its honesty rules
+One attempt: authoritative order read → ledger guards (`422` if the order is not `CREATED` or
+already paid, `422` if a charge is already in flight) → row `PENDING` → charge → report. No Feign
+inside a transaction (D-062/D-068). Honesty rules for the awkward combinations:
+
+- **Captured, then order-service refuses (`422`)** — reservation expired, or a racing attempt won:
+  the row is rewritten `FAILED` with the reason and the caller gets the `422`. Never a quiet
+  `success=false`, which would look like a plain decline while the money was taken.
+- **Captured, but order-service is unreachable** — the row stays `SUCCEEDED` (the money is real;
+  only the confirmation is pending) and the caller gets the `503`. A reconciliation sweep for this
+  window is future work.
+- **Declined** — the row is `FAILED`, order-service's `payment-failed` callback is reported
+  best-effort (a decline-report outage never hides the decline from the customer; the order side
+  reconciles through its reservation TTL / the owner's cancel).
+
+The HTTP shape of a decline: `200` with `success=false` and the `FAILED` payment in `data` — the
+attempt is a recorded fact, its outcome is data. A capture is `201`. The `payment-confirmed` /
+`payment-failed` callbacks are idempotent (D-071), which is what makes the retry policy on the
+report calls safe.
+
+## D-078 — Gateway routes for payment-service
+
+| Path | Target | Auth |
+|---|---|---|
+| `/api/v1/admin/payments/**` | `lb://payment-service` | `ADMIN` |
+| `/api/v1/payments/**` | `lb://payment-service` | `JWT` |
+
+api-gateway is now at **30 tests**.
+
+## D-079 — payment-service tests
+**35 tests**, all green, against a real MySQL (Flyway + `ddl-auto=validate` in the context test):
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `service/PaymentServiceTest` | 16 | the flow (capture + report, amount from the order, unknown/foreign order 404, not-`CREATED` 422, already-paid 422, in-flight 422), declines (reported, report outage swallowed), the honesty rules (refused capture → `FAILED` + 422, unreportable capture → stays `SUCCEEDED` + 503), reads (owner, foreign-is-404, admin), filters |
+| `service/DownstreamClientsTest` | 7 | order 404 unwrap, outage → 503 after retries, callback 422 unwrap (not retried), idempotent-callback retry then succeed, non-retryable single attempt |
+| `controller/PaymentControllerTest` | 9 | pay 201 captured / 200 declined shapes, validation map, 422/404/503 mappings, reads, paged list |
+| `controller/AdminPaymentControllerTest` | 2 | status and order filters |
+| `PaymentServiceApplicationTests` | 1 | context load (Eureka off) |

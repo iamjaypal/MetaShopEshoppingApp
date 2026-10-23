@@ -15,7 +15,7 @@ Foundational choices and deviations are recorded in [`docs/DECISIONS.md`](docs/D
 | **inventory-service** | **8083** | ✅ complete (see below) |
 | **cart-service** | **8084** | ✅ complete (see below) |
 | **order-service** | **8085** | ✅ complete (see below) |
-| payment-service | 8086 | ⬜ scaffold only |
+| **payment-service** | **8086** | ✅ complete (see below) |
 | notification-service | 8087 | ⬜ not started |
 
 ## Repository layout
@@ -32,7 +32,9 @@ MetaShop/
 ├── product-service/            # catalog              (:8082) — complete
 ├── inventory-service/          # stock & reservations (:8083) — complete
 ├── cart-service/               # shopping cart        (:8084) — complete
-└── order-service/              # checkout & orders    (:8085) — complete
+├── order-service/              # checkout & orders    (:8085) — complete
+├── payment-service/            # payment ledger       (:8086) — complete
+└── notification-service/       # notifications        (:8087) — not started
 ```
 
 > Runtime versions are pinned to what is already in use: **Java 21** and **Spring Boot 4.1.0**
@@ -43,7 +45,7 @@ MetaShop/
 
 ## Running the stack
 
-Start the seven services in this order (each in its own terminal, from the repo root):
+Start the eight services in this order (each in its own terminal, from the repo root):
 
 ```bash
 cd discovery-server   && ./mvnw spring-boot:run   # :8761  registry (start first)
@@ -52,19 +54,20 @@ cd product-service    && ./mvnw spring-boot:run   # :8082
 cd inventory-service  && ./mvnw spring-boot:run   # :8083
 cd cart-service       && ./mvnw spring-boot:run   # :8084
 cd order-service      && ./mvnw spring-boot:run   # :8085
+cd payment-service    && ./mvnw spring-boot:run   # :8086
 cd api-gateway        && ./mvnw spring-boot:run   # :8080  public entry point (start last)
 ```
 
 Then:
 
 - Eureka dashboard: http://localhost:8761/ — should list `API-GATEWAY`, `AUTH-SERVICE`,
-  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`, `CART-SERVICE`, `ORDER-SERVICE`
+  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`, `CART-SERVICE`, `ORDER-SERVICE`, `PAYMENT-SERVICE`
 - Gateway route table: http://localhost:8080/actuator/gateway/routes
 - Everything goes through **http://localhost:8080** — e.g.
   `curl http://localhost:8080/api/v1/products?size=2`
 
 The gateway resolves services from Eureka, so it needs a service to have registered **and** its own
-registry cache to have refreshed (30 s by default). On a cold start allow ~30–60 s after all six
+registry cache to have refreshed (30 s by default). On a cold start allow ~30–60 s after all eight
 are up before the first routed call.
 
 > Internal, service-to-service endpoints (`/api/v1/internal/**`) are **not** routed by the gateway
@@ -145,6 +148,8 @@ Requires discovery-server plus at least one downstream service to be running.
 | `/api/v1/cart/**` | `lb://cart-service` | JWT |
 | `/api/v1/admin/orders/**` | `lb://order-service` | ADMIN |
 | `/api/v1/orders/**` | `lb://order-service` | JWT |
+| `/api/v1/admin/payments/**` | `lb://payment-service` | ADMIN |
+| `/api/v1/payments/**` | `lb://payment-service` | JWT |
 | `/api/v1/internal/**` | — | **not routed** (404) |
 
 ### Configuration
@@ -667,8 +672,89 @@ constraints on both enums) and `order_items` (the frozen product snapshots). Hib
 `ddl-auto=validate`.
 
 ### Still to do (later phases)
-- `payment-confirmed` / `payment-failed` become real calls once **payment-service** (`:8086`) lands —
-  the endpoints already exist and are idempotent (D-071)
 - `OrderCreatedEvent` / `OrderConfirmedEvent` publishing (Kafka) — §14, D-019
-- A refund-aware cancellation for paid orders (payment-service + admin)
+- A refund-aware cancellation for paid orders (with payment-service's refund flow)
+- Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
+
+---
+
+## payment-service
+
+The payment ledger (spec §12). The customer pays for an order through the **mock gateway** — the
+only decision in the request is the method (`CARD` / `UPI` / `WALLET`). The amount is always the
+order's frozen total, read from order-service's authoritative internal API, and the outcome is
+reported back through order-service's `payment-confirmed` / `payment-failed` callbacks, which
+confirm or release the reserved stock (D-077). One row per **attempt**: a decline stays in the
+ledger as `FAILED`, the retry is a new row.
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Data JPA (Hibernate 7) · MySQL 8 · **Flyway** · Spring Security
+(JWT verification + internal-token filter) · Eureka client · **OpenFeign + Spring Cloud LoadBalancer
++ Resilience4j** (retry + circuit breaker on order-service) · Lombok · springdoc-openapi
+(Swagger UI) · JUnit 5 + Mockito + MockMvc.
+
+### Prerequisites
+- Java 21
+- MySQL 8 running on `localhost:3306` with a `root` user (dev credentials in
+  `src/main/resources/application.properties`)
+- order-service (`:8085`) reachable — every payment reads the order and reports the result to it
+
+Create the (empty) schema once; Flyway creates all tables:
+
+```sql
+CREATE DATABASE metashop_payment_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Run
+
+```bash
+cd payment-service
+./mvnw spring-boot:run
+```
+
+Swagger UI: http://localhost:8086/swagger-ui.html
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `server.port` | `8086` | spec §3.1 |
+| `spring.datasource.url` | `jdbc:mysql://localhost:3306/metashop_payment_db` | |
+| `eureka.client.service-url.defaultZone` | `http://localhost:8761/eureka` | env `EUREKA_URL` |
+| `metashop.jwt.secret` | dev key | **must equal auth-service's**; env `JWT_SECRET` |
+| `metashop.jwt.issuer` | `metashop-auth-service` | |
+| `metashop.internal.token` | dev token | env `INTERNAL_TOKEN`; signs the outbound calls to order-service |
+| `metashop.payment.gateway-mode` | `SUCCESS` | `FAILURE` demos the decline/release path; `RANDOM` flips a coin (D-075) |
+| `metashop.resilience.*` | 3 attempts, 10-call window | retry + circuit-breaker tuning (D-077) |
+| `spring.cloud.openfeign.client.config.default.*` | 2 s connect / 5 s read | the downstream timeout |
+
+### Database migrations
+
+`src/main/resources/db/migration/V1__init.sql` creates `payments` (one row per attempt, `CHECK`
+constraints on method/status/amount). Hibernate runs with `ddl-auto=validate`.
+
+### Test
+
+```bash
+cd payment-service
+./mvnw test
+```
+
+35 tests. MySQL must be reachable: the context test runs Flyway + Hibernate validation.
+
+### API
+
+Full reference in [`docs/API.md`](docs/API.md). Highlights:
+
+| Area | Endpoints |
+|---|---|
+| Pay | `POST /api/v1/payments` — body `{orderId, method}`; `201` captured (`order → CONFIRMED`) or `200` + `success=false` declined (`order → CANCELLED`) |
+| Read | `GET /api/v1/payments` (paged), `GET /api/v1/payments/{id}` (owner or admin) |
+| Admin | `GET /api/v1/admin/payments` — the whole ledger, `?status=` / `?orderId=` filters |
+
+### Still to do (later phases)
+- A reconciliation sweep for charges captured while order-service was unreachable (currently the
+  ledger row stays `SUCCEEDED` and the caller gets a `503`, D-077)
+- Refunds (and the refund-aware cancellation of paid orders on order-service)
+- `PaymentCompletedEvent` publishing (Kafka) — §14, D-019
 - Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase

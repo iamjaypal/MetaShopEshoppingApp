@@ -1,6 +1,7 @@
 package com.shopMeta.order_service.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,6 +31,21 @@ import lombok.RequiredArgsConstructor;
 public class InternalOrderController {
 
     private final OrderService orderService;
+
+    /**
+     * The authoritative order state for internal callers — payment-service reads owner, status and
+     * the frozen total from here before taking a charge (it never trusts the client's amount).
+     * Plain JSON (no envelope), same as the other internal APIs (D-022).
+     */
+    @Operation(summary = "Order snapshot for internal callers",
+            description = "Requires X-Internal-Token. Returns the order exactly as the public "
+                    + "detail endpoint does, including the owner id — the caller (payment-service) "
+                    + "checks ownership and the lifecycle status itself.")
+    @GetMapping("/{id}")
+    public ResponseEntity<OrderResponse> getOrder(@PathVariable("id") Long id) {
+
+        return ResponseEntity.ok(orderService.getInternalOrder(id));
+    }
 
     @Operation(summary = "Report a successful payment",
             description = "Requires X-Internal-Token. Moves the order CREATED → CONFIRMED, turns "

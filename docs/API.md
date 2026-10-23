@@ -49,6 +49,8 @@ limiting, and routes to services through Eureka (`lb://<service-name>`).
 | `/api/v1/cart/**` | `lb://cart-service` | JWT |
 | `/api/v1/admin/orders/**` | `lb://order-service` | ADMIN |
 | `/api/v1/orders/**` | `lb://order-service` | JWT |
+| `/api/v1/admin/payments/**` | `lb://payment-service` | ADMIN |
+| `/api/v1/payments/**` | `lb://payment-service` | JWT |
 | `/api/v1/internal/**` | — | **not routed** (404) |
 
 ### Headers
@@ -599,6 +601,85 @@ must surface, not swallow.
 The `orders` row carries a `@Version` column: a racing payment callback and an admin update make
 the loser fail with a retryable `409` instead of double-transitioning — and because the payment
 callbacks are idempotent, the retry lands on the replay branch.
+
+---
+
+## Payment Service (`:8086`)
+
+The payment ledger. The customer pays for an order through the mock gateway; the amount is read
+from order-service's authoritative internal API (never from the request), and the outcome is
+reported back through order-service's `payment-confirmed` / `payment-failed` callbacks (D-071),
+which confirm or release the reserved stock. One row per **attempt**: a decline stays in the
+ledger as `FAILED` and the retry is a new row (D-075).
+
+- Gateway behaviour: `metashop.payment.gateway-mode` = `SUCCESS` (default) | `FAILURE` (demo the
+  release path) | `RANDOM`. A real gateway replaces only the `MockPaymentGateway` bean.
+
+### Customer (JWT)
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/v1/payments` | Pay for an order — body `{ "orderId": 100, "method": "CARD" }` (`CARD`/`UPI`/`WALLET`). `201` when captured (`order → CONFIRMED`, stock sold, cart cleared); `200` + `success=false` when declined (`order → CANCELLED`, stock released, the `FAILED` attempt in `data`). |
+| GET | `/api/v1/payments` | Your payment attempts, paged, newest first. |
+| GET | `/api/v1/payments/{id}` | One attempt — owner or admin; a customer asking for someone else's gets the same `404` as a missing one. |
+
+Example — captured:
+
+```json
+{
+  "success": true,
+  "message": "Payment captured; the order is confirmed",
+  "data": {
+    "id": 1, "orderId": 3, "userId": 2,
+    "amount": 7712.00, "method": "CARD", "status": "SUCCEEDED",
+    "gatewayReference": "MOCK-3-9f2c1a8b", "failureReason": null,
+    "createdAt": "...", "updatedAt": "..."
+  }
+}
+```
+
+Example — declined (`200`, the attempt is a recorded fact, its outcome is data):
+
+```json
+{
+  "success": false,
+  "message": "Declined by the mock gateway",
+  "data": { "id": 2, "orderId": 4, "status": "FAILED", "failureReason": "Declined by the mock gateway", "...": "..." }
+}
+```
+
+### Admin (ADMIN)
+
+| Method | Path | Description |
+|---|---|---|
+| GET | `/api/v1/admin/payments` | The whole ledger, paged; filter by `?status=` or `?orderId=` (order wins when both are given). |
+
+### Payment states
+
+| State | Meaning |
+|---|---|
+| `PENDING` | The charge is being taken (an interrupted attempt is visible in the ledger). |
+| `SUCCEEDED` | Gateway captured **and** order-service confirmed the order. |
+| `FAILED` | Declined by the gateway, or the capture could not be applied (order refused the confirmation). The customer may retry — a new row. |
+
+### Honesty rules (D-077)
+
+- Captured but order-service **refuses** (`422`, e.g. the reservation expired): the row becomes
+  `FAILED` with the reason and the caller gets the `422` — never a quiet decline while the money
+  was taken.
+- Captured but order-service is **unreachable**: the row stays `SUCCEEDED` (the money is real) and
+  the caller gets the `503`. A reconciliation sweep is future work.
+- Declined but the failure report cannot be delivered: the row stays `FAILED` and the decline is
+  still returned — the order side reconciles through its reservation TTL / the owner's cancel.
+
+### Internal (service-to-service)
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/api/v1/internal/orders/{id}` (on **order-service**) | `X-Internal-Token` | The authoritative order read payment-service takes the amount and the ownership/status checks from (D-076). |
+
+payment-service's own internal endpoints: none yet — refund flows / a notification consumer would
+add them when the consumer exists.
 
 ---
 

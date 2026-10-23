@@ -111,6 +111,21 @@ class GatewayRoutesConfigTest {
     }
 
     @Test
+    void paymentsRequireJwtAndTheirAdminSideRequiresAdmin() {
+        Map<String, Route> routes = routes();
+
+        Route admin = routes.get("payment-service-admin");
+        assertThat(admin).isNotNull();
+        assertThat(admin.getUri().toString()).isEqualTo("lb://payment-service");
+        assertThat(admin.getMetadata().get(METADATA_KEY)).isEqualTo(ADMIN.name());
+
+        Route payments = routes.get("payment-service");
+        assertThat(payments).isNotNull();
+        assertThat(payments.getUri().toString()).isEqualTo("lb://payment-service");
+        assertThat(payments.getMetadata().get(METADATA_KEY)).isEqualTo(JWT.name());
+    }
+
+    @Test
     void internalEndpointsAreNeverRouted() {
         assertThat(routeLocator.getRoutes().collectList().block())
                 .noneMatch(route -> route.getPredicate() != null

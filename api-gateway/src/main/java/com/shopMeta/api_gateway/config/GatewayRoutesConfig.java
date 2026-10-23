@@ -18,9 +18,10 @@ import org.springframework.context.annotation.Configuration;
  * so the JWT filter does not have to hard-code path rules.
  *
  * <p>Only services that are actually deployed get a route: auth-service, product-service,
- * inventory-service, cart-service and order-service today. Routes for payment-service are added
- * as those services land. {@code /api/v1/internal/**} is deliberately <em>not</em> routed: internal,
- * service-to-service endpoints must never be reachable from the outside (spec 5.4 / 19).
+ * inventory-service, cart-service, order-service and payment-service today. Routes for
+ * notification-service are added as those services land. {@code /api/v1/internal/**} is
+ * deliberately <em>not</em> routed: internal, service-to-service endpoints must never be reachable
+ * from the outside (spec 5.4 / 19).
  */
 @Configuration
 public class GatewayRoutesConfig {
@@ -92,6 +93,19 @@ public class GatewayRoutesConfig {
                         .path("/api/v1/orders/**")
                         .metadata(METADATA_KEY, JWT.name())
                         .uri("lb://order-service"))
+
+                // ---------- payment-service (:8086) ----------
+                // The whole payment ledger is user-scoped (JWT) except the admin overview.
+                // /api/v1/internal/payments/** stays unrouted if it is ever added.
+                .route("payment-service-admin", r -> r
+                        .path("/api/v1/admin/payments/**")
+                        .metadata(METADATA_KEY, ADMIN.name())
+                        .uri("lb://payment-service"))
+
+                .route("payment-service", r -> r
+                        .path("/api/v1/payments/**")
+                        .metadata(METADATA_KEY, JWT.name())
+                        .uri("lb://payment-service"))
 
                 .build();
     }

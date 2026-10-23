@@ -42,6 +42,10 @@
       "value": "http://localhost:8085"
     },
     {
+      "key": "paymentUrl",
+      "value": "http://localhost:8086"
+    },
+    {
       "key": "internalToken",
       "value": "MetaShopDevOnlyInternalTokenChangeMe0123456789"
     }
@@ -2773,6 +2777,390 @@
                     "payment-failed"
                   ]
                 }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payment Service",
+      "item": [
+        {
+          "name": "Payments (JWT)",
+          "item": [
+            {
+              "name": "Pay for an order (CARD)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"orderId\": {{orderId}},\n  \"method\": \"CARD\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "The amount is read from the order (authoritative, never the request). 201 = captured (order CONFIRMED, cart cleared, stock sold); 200 + success=false = declined (order CANCELLED, stock released). Gateway mode is metashop.payment.gateway-mode on :8086 (SUCCESS / FAILURE / RANDOM)."
+              }
+            },
+            {
+              "name": "Pay for an order (UPI)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"orderId\": {{orderId}},\n  \"method\": \"UPI\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "My payment attempts",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments?page=0&size=20",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "One payment attempt",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments/{{paymentId}}",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments",
+                    "{{paymentId}}"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin (ADMIN role)",
+          "item": [
+            {
+              "name": "The whole ledger",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/admin/payments?page=0&size=20",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "payments"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Ledger filtered by status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/admin/payments?status=FAILED&page=0&size=20",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "payments"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Ledger of one order",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/admin/payments?orderId={{orderId}}",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "payments"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guard rails",
+          "item": [
+            {
+              "name": "Pay someone else's / unknown order → 404",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"orderId\": 999999,\n  \"method\": \"CARD\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Same 404 for unknown and foreign orders — ids cannot be probed."
+              }
+            },
+            {
+              "name": "Pay a settled order → 422",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"orderId\": {{orderId}},\n  \"method\": \"CARD\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Only orders in CREATED can be paid. Re-run after a capture → 422 (already paid / already confirmed)."
+              }
+            },
+            {
+              "name": "Double click → 422 (charge in flight)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"orderId\": {{orderId}},\n  \"method\": \"CARD\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "description": "Fire twice in parallel against a fresh CREATED order: the loser gets 422 'already in progress'."
+              }
+            },
+            {
+              "name": "No token → 401",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{paymentUrl}}/api/v1/payments",
+                  "host": [
+                    "{{paymentUrl}}"
+                  ],
+                  "path": [
+                    "{{paymentUrl}}",
+                    "api",
+                    "v1",
+                    "payments"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Internal",
+          "item": [
+            {
+              "name": "Order snapshot for payment-service (order-service)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "X-Internal-Token",
+                    "value": "{{internalToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/internal/orders/{{orderId}}",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "{{orderUrl}}",
+                    "api",
+                    "v1",
+                    "internal",
+                    "orders",
+                    "{{orderId}}"
+                  ]
+                },
+                "description": "The authoritative read payment-service takes the amount and the ownership/status checks from (D-076). Plain JSON, no envelope."
               }
             }
           ]

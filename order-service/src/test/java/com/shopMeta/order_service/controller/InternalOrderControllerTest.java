@@ -1,6 +1,7 @@
 package com.shopMeta.order_service.controller;
 
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -80,6 +81,30 @@ class InternalOrderControllerTest {
                 .willThrow(new ResourceNotFoundException("Order 404 was not found"));
 
         mockMvc.perform(post("/api/v1/internal/orders/404/payment-confirmed"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    void getOrderInternal_returnsTheOrderSnapshot() throws Exception {
+
+        given(orderService.getInternalOrder(100L))
+                .willReturn(OrderControllerTest.createdOrder());
+
+        mockMvc.perform(get("/api/v1/internal/orders/100"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(100))
+                .andExpect(jsonPath("$.total").value(449.00))
+                .andExpect(jsonPath("$.success").doesNotExist());
+    }
+
+    @Test
+    void getOrderInternal_forAnUnknownOrder_returns404() throws Exception {
+
+        given(orderService.getInternalOrder(404L))
+                .willThrow(new ResourceNotFoundException("Order 404 was not found"));
+
+        mockMvc.perform(get("/api/v1/internal/orders/404"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.success").value(false));
     }

@@ -213,6 +213,22 @@ public class OrderService {
         return toResponse(order);
     }
 
+    // ------------------------------------------------------------------ internal reads
+
+    /**
+     * The authoritative order state for service-to-service callers (payment-service reads owner,
+     * status and the frozen total from here before taking a charge). Same visibility as an admin:
+     * ownership is checked by the caller, who gets the owner id in the response.
+     */
+    public OrderResponse getInternalOrder(Long orderId) {
+
+        Order order = orderStore.findWithItems(orderId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Order " + orderId + " was not found"));
+
+        return toResponse(order);
+    }
+
     // ------------------------------------------------------------------ payment callbacks (internal)
 
     public OrderResponse paymentConfirmed(Long orderId) {
