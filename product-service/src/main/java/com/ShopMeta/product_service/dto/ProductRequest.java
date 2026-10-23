@@ -1,10 +1,8 @@
 package com.ShopMeta.product_service.dto;
 
-
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 
 import lombok.Getter;
@@ -17,34 +15,30 @@ import java.math.BigDecimal;
 public class ProductRequest {
 
     @NotBlank(message = "Product name is required")
-    @Size(max = 150, message = "Product name cannot exceed 150 characters")
+    @Size(max = 200, message = "Product name cannot exceed 200 characters")
     private String name;
-
-    @NotBlank(message = "Product description is required")
-    private String description;
 
     @NotBlank(message = "SKU is required")
     @Size(max = 50, message = "SKU cannot exceed 50 characters")
     private String sku;
 
+    @Size(max = 500, message = "Short description cannot exceed 500 characters")
+    private String shortDescription;
+
+    private String description;
+
     @NotNull(message = "Price is required")
     @DecimalMin(value = "0.01", message = "Price must be greater than 0")
     private BigDecimal price;
 
-    @NotNull(message = "Stock quantity is required")
-    @PositiveOrZero(message = "Stock quantity cannot be negative")
-    private Integer stockQuantity;
+    @DecimalMin(value = "0.01", message = "MRP must be greater than 0")
+    private BigDecimal mrp;
 
-    @NotBlank(message = "Category is required")
-    @Size(max = 100, message = "Category cannot exceed 100 characters")
-    private String category;
+    @NotNull(message = "Category is required")
+    private Long categoryId;
 
-    @NotBlank(message = "Brand is required")
-    @Size(max = 100, message = "Brand cannot exceed 100 characters")
-    private String brand;
-
-    @Size(max = 500, message = "Image URL cannot exceed 500 characters")
-    private String imageUrl;
+    @NotNull(message = "Brand is required")
+    private Long brandId;
 
     private Boolean active;
 }

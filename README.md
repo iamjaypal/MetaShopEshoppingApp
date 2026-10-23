@@ -1,0 +1,467 @@
+# MetaShop
+
+Industry-style e-commerce platform: Spring Boot microservices + MySQL + Kafka + Angular.
+This repository is being built phase by phase following `MetaShop-Master-Spec.md`.
+Foundational choices and deviations are recorded in [`docs/DECISIONS.md`](docs/DECISIONS.md).
+
+## Status
+
+| Service | Port | Status |
+|---|---|---|
+| **auth-service** | **8081** | ✅ complete (see below) |
+| **product-service** | **8082** | ✅ complete (see below) |
+| **discovery-server** | **8761** | ✅ complete (see below) |
+| **api-gateway** | **8080** | ✅ complete (see below) |
+| **inventory-service** | **8083** | ✅ complete (see below) |
+| cart-service | 8084 | ⬜ scaffold only |
+| order-service | 8085 | ⬜ scaffold only |
+| payment-service | 8086 | ⬜ scaffold only |
+| notification-service | 8087 | ⬜ not started |
+
+## Repository layout
+
+```
+MetaShop/
+├── docs/
+│   ├── DECISIONS.md            # design decisions & spec deviations
+│   ├── API.md                  # API reference
+│   └── postman/MetaShop.postman_collection.json
+├── discovery-server/           # Eureka registry      (:8761) — complete
+├── api-gateway/                # Spring Cloud Gateway (:8080) — complete
+├── auth-service/               # auth / users         (:8081) — complete
+├── product-service/            # catalog              (:8082) — complete
+└── inventory-service/          # stock & reservations (:8083) — complete
+```
+
+> Runtime versions are pinned to what is already in use: **Java 21** and **Spring Boot 4.1.0**
+> with **Spring Cloud 2025.1.3** (see D-001, D-039). Each service is currently a standalone Maven
+> project; a parent POM + `common-lib` will be introduced with the shared infrastructure phase.
+
+---
+
+## Running the stack
+
+Start the five services in this order (each in its own terminal, from the repo root):
+
+```bash
+cd discovery-server   && ./mvnw spring-boot:run   # :8761  registry (start first)
+cd auth-service       && ./mvnw spring-boot:run   # :8081
+cd product-service    && ./mvnw spring-boot:run   # :8082
+cd inventory-service  && ./mvnw spring-boot:run   # :8083
+cd api-gateway        && ./mvnw spring-boot:run   # :8080  public entry point (start last)
+```
+
+Then:
+
+- Eureka dashboard: http://localhost:8761/ — should list `API-GATEWAY`, `AUTH-SERVICE`,
+  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`
+- Gateway route table: http://localhost:8080/actuator/gateway/routes
+- Everything goes through **http://localhost:8080** — e.g.
+  `curl http://localhost:8080/api/v1/products?size=2`
+
+The gateway resolves services from Eureka, so it needs a service to have registered **and** its own
+registry cache to have refreshed (30 s by default). On a cold start allow ~30–60 s after all five
+are up before the first routed call.
+
+> Internal, service-to-service endpoints (`/api/v1/internal/**`) are **not** routed by the gateway
+> and are called on the service port directly with an `X-Internal-Token` header (D-041, D-050).
+
+---
+
+## discovery-server
+
+Eureka service registry (spec §6.1). Every service registers here; the gateway resolves
+`lb://<service-name>` through it.
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Cloud Netflix Eureka Server 5.0.2 · Spring Cloud 2025.1.3.
+
+### Run
+
+```bash
+cd discovery-server
+./mvnw spring-boot:run         # starts on :8761
+```
+
+- Dashboard: http://localhost:8761/
+- Registry (JSON): http://localhost:8761/eureka/apps
+- Health: http://localhost:8761/actuator/health
+
+A registry does not register with itself (`register-with-eureka=false`). Self-preservation is off
+so a stopped service disappears quickly during development. There is no Spring Security on the
+registry — see D-040.
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `server.port` | `8761` | spec §3.1 |
+| `eureka.server.eviction-interval-timer-in-ms` | `5000` | faster dev feedback |
+
+### Test
+
+```bash
+cd discovery-server
+./mvnw test                    # 1 test (context load)
+```
+
+---
+
+## api-gateway
+
+Single public entry point (spec §6.2). Routes `/api/v1/**` to services through Eureka, validates
+the JWT, propagates the caller identity, applies CORS and rate limiting, and returns one JSON
+error shape.
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · **Spring Cloud Gateway 5.0.3 (WebFlux)** · Eureka client ·
+jjwt 0.12 · Lombok · JUnit 5 + Reactor Test.
+The gateway is reactive — `spring-boot-starter-webmvc` must never be on its classpath.
+
+### Run
+
+```bash
+cd api-gateway
+./mvnw spring-boot:run         # starts on :8080
+```
+
+Requires discovery-server plus at least one downstream service to be running.
+
+### Route table
+
+| Path pattern | Target | Auth |
+|---|---|---|
+| `/api/v1/auth/**` | `lb://auth-service` | Public |
+| `/api/v1/users/**` | `lb://auth-service` | JWT |
+| `/api/v1/admin/users/**` | `lb://auth-service` | ADMIN |
+| `/api/v1/admin/{products,categories,brands}/**` | `lb://product-service` | ADMIN |
+| `/api/v1/{products,categories,brands}/**` | `lb://product-service` | Public |
+| `/api/v1/admin/inventory/**` | `lb://inventory-service` | ADMIN |
+| `/api/v1/inventory/**` | `lb://inventory-service` | Public |
+| `/api/v1/internal/**` | — | **not routed** (404) |
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `server.port` | `8080` | spec §3.1 |
+| `eureka.client.service-url.defaultZone` | `http://localhost:8761/eureka` | env `EUREKA_URL` |
+| `metashop.gateway.jwt.secret` | dev key | **must equal auth-service's**; env `JWT_SECRET` |
+| `metashop.gateway.jwt.issuer` | `metashop-auth-service` | |
+| `metashop.gateway.cors.allowed-origins[0]` | `http://localhost:4200` | env `ANGULAR_ORIGIN` |
+| `metashop.gateway.rate-limit.requests-per-window` | `5` | per IP, per credential endpoint |
+| `metashop.gateway.rate-limit.window-seconds` | `60` | |
+| `spring.cloud.gateway.server.webflux.httpclient.connect-timeout` | `5000` | ms |
+| `spring.cloud.gateway.server.webflux.httpclient.response-timeout` | `15s` | |
+
+### Behaviour
+
+| Situation | Result |
+|---|---|
+| No / malformed / expired / foreign-signed token | `401 UNAUTHORIZED` |
+| Valid token, non-ADMIN role on an ADMIN route | `403 FORBIDDEN` |
+| No route matches | `404 ROUTE_NOT_FOUND` |
+| Downstream service down or timed out | `503 SERVICE_UNAVAILABLE` |
+| > 5 credential requests/min from one IP | `429 RATE_LIMIT_EXCEEDED` + `Retry-After` |
+| Inbound `X-User-*` headers | always stripped (anti-spoofing) |
+| `X-Correlation-Id` | generated if absent, forwarded downstream, echoed back |
+
+### Observability
+
+- `GET /actuator/health`
+- `GET /actuator/gateway/routes` — the active route table (read-only)
+
+### Test
+
+```bash
+cd api-gateway
+./mvnw test                    # 26 tests
+```
+
+Route table, JWT filter (public/JWT/ADMIN, bad tokens, identity propagation, spoof stripping),
+rate limiter, correlation id and error writer.
+
+### Still to do (later phases)
+- Redis-backed `RequestRateLimiter` (replaces the in-memory counter) — D-044
+- Circuit breaker / retry on downstream failures (`Resilience4J`) — spec §6.2, needs the
+  resilience phase
+- MDC (`traceId`/`userId`/`service`) context propagation — D-043
+- Actuator (`metrics`, `prometheus`) + Dockerfile — deployment phase
+
+---
+
+## auth-service
+
+Auth/User microservice: registration, login, JWT access + refresh tokens (with rotation),
+profile, password change, forgot/reset password, address book, roles and admin user
+management.
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Security · Spring Data JPA (Hibernate 7) · MySQL 8 ·
+**Flyway** · **jjwt 0.12** · Eureka client · Lombok · springdoc-openapi (Swagger UI) ·
+JUnit 5 + Mockito + MockMvc.
+
+### Prerequisites
+- Java 21
+- MySQL 8 on `localhost:3306` with a `root` user
+
+Create the (empty) schema once; Flyway creates all tables:
+
+```sql
+CREATE DATABASE metashop_auth_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Run
+
+```bash
+cd auth-service
+./mvnw spring-boot:run         # starts on :8081
+```
+
+- Swagger UI: http://localhost:8081/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:8081/v3/api-docs
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `metashop.jwt.secret` | dev key | **override with `JWT_SECRET`** (≥ 256 bit) |
+| `metashop.jwt.access-token-ttl` | `15m` | spec 7.4 |
+| `metashop.jwt.refresh-token-ttl` | `7d` | spec 7.4 |
+| `metashop.security.max-failed-login-attempts` | `5` | lockout threshold |
+| `metashop.security.lock-duration` | `15m` | lockout duration |
+| `metashop.security.password-reset-ttl` | `30m` | reset-token lifetime |
+
+### Demo accounts
+
+Seeded outside the `prod` profile (override passwords with `ADMIN_PASSWORD` /
+`CUSTOMER_PASSWORD`):
+
+| Role | Email | Password |
+|---|---|---|
+| ADMIN | `admin@metashop.com` | `Admin@12345` |
+| CUSTOMER | `customer@metashop.com` | `Customer@12345` |
+
+### Test
+
+```bash
+cd auth-service
+./mvnw test
+```
+
+73 tests (service unit tests with Mockito, controller tests with MockMvc, context test).
+MySQL must be reachable because Flyway + Hibernate validation run in the context test.
+
+### API
+
+Full reference in [`docs/API.md`](docs/API.md). Highlights:
+
+| Area | Endpoints |
+|---|---|
+| Auth (public) | `POST /api/v1/auth/register`, `/login`, `/refresh`, `/forgot-password`, `/reset-password` |
+| Auth (JWT) | `POST /api/v1/auth/logout` |
+| Profile (JWT) | `GET/PUT /api/v1/users/me`, `PUT /api/v1/users/me/password` |
+| Address book (JWT) | `/api/v1/users/me/addresses` CRUD + `PATCH /{id}/default` |
+| Admin | `GET /api/v1/admin/users`, `PATCH /api/v1/admin/users/{id}/status` |
+| Internal | `GET /api/v1/internal/users/{id}/addresses/{addressId}` |
+
+### Database migrations
+
+`src/main/resources/db/migration/V1__init.sql` creates `users`, `roles`, `user_roles`,
+`addresses`, `refresh_tokens`, `password_reset_tokens`. Hibernate runs with
+`ddl-auto=validate`.
+
+### Still to do (later phases)
+- `UserRegisteredEvent` / `PasswordResetRequestedEvent` publishing — D-030 (Kafka phase)
+- `X-Internal-Token` on `/internal/**` — D-022 pattern, security-hardening phase
+- Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
+
+> Rate limiting of login/register/forgot-password is enforced at the **api-gateway** (D-044),
+> not here.
+
+---
+
+## product-service
+
+Catalog microservice: categories (hierarchical), brands, products, product images and
+internal batch lookups. Owns the price source of truth. Stock is **not** stored here — it
+belongs to inventory-service (D-005).
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Data JPA (Hibernate 7) · MySQL 8 · **Flyway** ·
+Eureka client · Lombok · springdoc-openapi (Swagger UI) · JUnit 5 + Mockito + MockMvc.
+
+### Prerequisites
+- Java 21
+- MySQL 8 running on `localhost:3306` with a `root` user (dev credentials in
+  `src/main/resources/application.properties`)
+
+Create the (empty) schema once; Flyway creates all tables:
+
+```sql
+CREATE DATABASE metashop_product_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Run
+
+```bash
+cd product-service
+./mvnw spring-boot:run         # starts on :8082
+```
+
+- Swagger UI: http://localhost:8082/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:8082/v3/api-docs
+
+### Test
+
+```bash
+cd product-service
+./mvnw test
+```
+
+66 tests (service unit tests with Mockito, controller tests with MockMvc, context test).
+MySQL must be reachable because Flyway + Hibernate validation run in the context test.
+
+### API
+
+Full reference in [`docs/API.md`](docs/API.md). Highlights:
+
+| Area | Endpoints |
+|---|---|
+| Public products | `GET /api/v1/products`, `/{id}`, `/slug/{slug}` |
+| Public brands | `GET /api/v1/brands`, `/{id}` |
+| Public categories | `GET /api/v1/categories` (tree), `/{id}` |
+| Admin products | `/api/v1/admin/products` CRUD, `PATCH /{id}/status`, `POST/DELETE /{id}/images` |
+| Admin brands / categories | `/api/v1/admin/brands`, `/api/v1/admin/categories` CRUD |
+| Internal | `POST /api/v1/internal/products/batch`, `GET /api/v1/internal/products/{id}` |
+
+### Database migrations
+
+`src/main/resources/db/migration/V1__init.sql` creates `categories`, `brands`, `products`,
+`product_images`, `product_attributes`. Hibernate runs with `ddl-auto=validate`.
+
+### Seed data
+
+On startup (outside the `prod` profile) `config/DataSeeder` populates a demo catalog:
+**6 categories** (Electronics → Mobiles/Laptops, Fashion, Home & Kitchen, Sports),
+**10 brands** and **50 products** with an image and two attributes each. It is idempotent —
+it skips when `products` is already populated. To reseed, truncate the catalog tables (or drop
+and recreate the schema) and restart.
+
+### Still to do (later phases)
+- Redis product cache (`GET /api/v1/products/{id}`, TTL 5 min) — D-015/§8.4
+- `ProductCreatedEvent` / `ProductPriceChangedEvent` publishing — D-019 (Kafka phase)
+- `@PreAuthorize` on `/admin/**` and `X-Internal-Token` on `/internal/**` — D-010, D-022
+- Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
+
+---
+
+## inventory-service
+
+Stock source of truth (spec §9). Holds one row of counters per product
+(`available_quantity` / `reserved_quantity`), the per-order reservations that move units between
+them, and an append-only `stock_movements` audit trail. Its whole reason to exist is the promise
+that **stock is never oversold**, even when many orders hit the last unit at the same instant.
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Data JPA (Hibernate 7) · MySQL 8 · **Flyway** ·
+Spring Security (JWT verification + internal-token filter) · Eureka client · Spring `@Scheduled`
+(expiry sweeper) · Lombok · springdoc-openapi (Swagger UI) · JUnit 5 + Mockito + MockMvc.
+
+### Prerequisites
+- Java 21
+- MySQL 8 running on `localhost:3306` with a `root` user (dev credentials in
+  `src/main/resources/application.properties`)
+
+Create the (empty) schema once; Flyway creates all tables:
+
+```sql
+CREATE DATABASE metashop_inventory_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Run
+
+```bash
+cd inventory-service
+./mvnw spring-boot:run         # starts on :8083
+```
+
+- Swagger UI: http://localhost:8083/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:8083/v3/api-docs
+
+### Test
+
+```bash
+cd inventory-service
+./mvnw test
+```
+
+61 tests. MySQL must be reachable: the context test runs Flyway + Hibernate validation, and
+`concurrency/ReservationConcurrencyTest` fires **50 real parallel transactions** at a stock row of
+1 and asserts that exactly one wins (spec §17 phase 4).
+
+### How overselling is prevented
+
+`reserve` never reads a quantity and writes it back. Each line runs a single conditional statement:
+
+```sql
+UPDATE inventory
+   SET available_quantity = available_quantity - :quantity,
+       reserved_quantity  = reserved_quantity  + :quantity
+ WHERE product_id = :productId
+   AND available_quantity >= :quantity
+```
+
+Two transactions racing for the last unit both run it; the database serialises them and the loser
+updates **zero rows**, so the reservation is rejected with `409`. The whole order is one
+transaction, so a failure on the third line rolls the first two back — reserving is genuinely
+all-or-nothing. Lines are processed in ascending `product_id` order so two concurrent orders
+touching the same products cannot deadlock. See D-052 for the full reasoning.
+
+### API
+
+Full reference in [`docs/API.md`](docs/API.md). Highlights:
+
+| Area | Endpoints |
+|---|---|
+| Public | `GET /api/v1/inventory/{productId}` — in stock / capped quantity |
+| Admin | `POST /api/v1/admin/inventory`, `GET`/`PUT /{productId}`, `GET /low-stock` |
+| Internal | `POST /api/v1/internal/inventory/{reserve,release,confirm,availability}` |
+
+### Reservation lifecycle
+
+| Transition | Trigger | Effect on counters |
+|---|---|---|
+| `RESERVED` | order-service reserves at checkout | `available −n`, `reserved +n` |
+| `CONFIRMED` | payment succeeded | `reserved −n` (sold for good) |
+| `RELEASED` | payment failed / order cancelled | `available +n`, `reserved −n` |
+| `EXPIRED` | sweeper: not confirmed within the TTL | `available +n`, `reserved −n` |
+
+`reserve`, `release` and `confirm` are all **idempotent per `orderId`**, so a retried call from
+order-service can never hold or return stock twice.
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `server.port` | `8083` | spec §3.1 |
+| `spring.datasource.url` | `jdbc:mysql://localhost:3306/metashop_inventory_db` | |
+| `eureka.client.service-url.defaultZone` | `http://localhost:8761/eureka` | env `EUREKA_URL` |
+| `metashop.jwt.secret` | dev key | **must equal auth-service's**; env `JWT_SECRET` |
+| `metashop.jwt.issuer` | `metashop-auth-service` | |
+| `metashop.internal.token` | dev token | env `INTERNAL_TOKEN`; guards `/api/v1/internal/**` |
+| `metashop.inventory.default-low-stock-threshold` | `5` | used when a stock row is created without one |
+| `metashop.inventory.reservation-ttl` | `15m` | spec §9.4 |
+| `metashop.inventory.sweep-interval` | `60s` | how often the expiry sweeper runs |
+| `metashop.inventory.display-quantity-cap` | `10` | public endpoint never reports more than this |
+
+### Database migrations
+
+`src/main/resources/db/migration/V1__init.sql` creates `inventory`, `inventory_reservations`,
+`stock_movements` and `processed_events`. Hibernate runs with `ddl-auto=validate`.
+
+### Still to do (later phases)
+- `OrderCreatedEvent` / `PaymentCompletedEvent` consumers (Kafka) — §14, D-019
+- Redis cache for hot availability reads — §8.4
+- Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
+- Back-fill `X-Internal-Token` onto auth-service and product-service `/internal/**` — D-022, D-050

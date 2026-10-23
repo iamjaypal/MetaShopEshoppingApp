@@ -1,72 +1,77 @@
 package com.ShopMeta.product_service.controller;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 
-import java.util.List;
+import java.math.BigDecimal;
 
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import com.ShopMeta.product_service.Entity.Product;
-import com.ShopMeta.product_service.dto.ProductRequest;
+import com.ShopMeta.product_service.dto.ApiResponse;
+import com.ShopMeta.product_service.dto.ProductPageResponse;
 import com.ShopMeta.product_service.dto.ProductResponse;
 import com.ShopMeta.product_service.service.ProductService;
 
-import jakarta.validation.Valid;
 
+@Tag(name = "Products (public)", description = "Public catalog search, filters and product detail")
 @RestController
 @RequestMapping("/api/v1/products")
 @RequiredArgsConstructor
 public class ProductController {
-
     private final ProductService productService;
 
-    @PostMapping
-    public ResponseEntity<ProductResponse> createProduct(
-            @Valid @RequestBody ProductRequest request) {
+    @Operation(summary = "Search / filter / sort / paginate products",
+            description = "Only active products. size is clamped to 1..100; sort is whitelisted.")
+    @GetMapping
+    public ResponseEntity<ApiResponse<ProductPageResponse>> getAllProducts(
 
-        ProductResponse response = productService.createProduct(request);
+            @RequestParam(defaultValue = "0") int page,
 
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(response);
+            @RequestParam(defaultValue = "20") int size,
+
+            @RequestParam(defaultValue = "createdAt,desc") String sort,
+
+            @RequestParam(required = false) String q,
+
+            @RequestParam(required = false) String category,
+
+            @RequestParam(required = false) String brand,
+
+            @RequestParam(required = false) BigDecimal minPrice,
+
+            @RequestParam(required = false) BigDecimal maxPrice) {
+
+        ProductPageResponse response = productService.getAllProducts(
+                page,
+                size,
+                sort,
+                q,
+                category,
+                brand,
+                minPrice,
+                maxPrice);
+
+        return ResponseEntity.ok(
+                ApiResponse.<ProductPageResponse>builder()
+                        .success(true)
+                        .message("Products fetched successfully")
+                        .data(response)
+                        .build());
     }
 
-    @GetMapping
-    public ResponseEntity<List<ProductResponse>> getAllProducts() {
+    @GetMapping("/slug/{slug}")
+    public ResponseEntity<ProductResponse> getProductBySlug(
+            @PathVariable String slug) {
 
-        List<ProductResponse> products = productService.getAllProducts();
-
-        return ResponseEntity.ok(products);
+        return ResponseEntity.ok(productService.getProductBySlug(slug));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Product> getProductById(
+    public ResponseEntity<ProductResponse> getProductById(
             @PathVariable Long id) {
 
-        Product product = productService.getProductById(id);
-
-        return ResponseEntity.ok(product);
+        return ResponseEntity.ok(productService.getProductById(id));
     }
-
-    @PutMapping("/{id}")
-    public ResponseEntity<Product> updateProduct(
-            @PathVariable Long id,
-            @RequestBody Product product) {
-
-        Product updatedProduct = productService.updateProduct(id, product);
-
-        return ResponseEntity.ok(updatedProduct);
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteProduct(
-            @PathVariable Long id) {
-
-        productService.deleteProduct(id);
-
-        return ResponseEntity.noContent().build();
-    }
-
 }
