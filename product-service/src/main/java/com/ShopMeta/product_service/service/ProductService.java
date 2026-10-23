@@ -99,10 +99,7 @@ public class ProductService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
     }
 
-    /**
-     * Generates a URL slug from the name, appending a numeric suffix until it is unique.
-     * {@code excludeProductId} allows a product to keep its own slug on update.
-     */
+    
     private String uniqueSlug(String name, Long excludeProductId) {
 
         String base = SlugUtils.toSlug(name);
