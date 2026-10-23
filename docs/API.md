@@ -47,6 +47,8 @@ limiting, and routes to services through Eureka (`lb://<service-name>`).
 | `/api/v1/admin/inventory/**` | `lb://inventory-service` | ADMIN |
 | `/api/v1/inventory/**` | `lb://inventory-service` | Public |
 | `/api/v1/cart/**` | `lb://cart-service` | JWT |
+| `/api/v1/admin/orders/**` | `lb://order-service` | ADMIN |
+| `/api/v1/orders/**` | `lb://order-service` | JWT |
 | `/api/v1/internal/**` | — | **not routed** (404) |
 
 ### Headers
@@ -503,6 +505,100 @@ The unique key on `(cart_id, product_id)` makes a concurrent double-add safe: th
 fails and the caller retries once onto the update path. The `carts` row carries a `@Version`
 column, so two racing mutations make the loser fail with a retryable `409` instead of silently
 losing a line.
+
+---
+
+## Order Service (`:8085`)
+
+Checkout and the order lifecycle (spec 11). An order is created **from the caller's cart** — there
+is no way to pass order lines in the body. Prices, sku/name/image and the shipping address are
+**frozen as snapshots at checkout** (spec 10.2): the order is the receipt and never moves when the
+catalogue or the address book changes afterwards.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/api/v1/orders` | JWT | Checkout: body `{ "shippingAddressId": 9 }`. Builds the order from the caller's cart, freezes the money + address snapshots, reserves stock, returns `201` with the order in `CREATED`. |
+| GET | `/api/v1/orders` | JWT | The caller's orders, paged, newest first. |
+| GET | `/api/v1/orders/{id}` | JWT | One order. Owner or admin — anyone else gets the same `404` as a missing order. |
+| POST | `/api/v1/orders/{id}/cancel` | JWT | Owner cancels while `CREATED` (unpaid); the stock holds are released. |
+| GET | `/api/v1/admin/orders` | ADMIN | Every user's orders, paged, optional `?status=` filter. |
+| POST | `/api/v1/admin/orders/{id}/status` | ADMIN | Fulfilment: body `{ "status": "SHIPPED" \| "DELIVERED" \| "CANCELLED" }`. |
+
+### Order response
+
+```json
+{
+  "id": 100, "userId": 1,
+  "status": "CREATED", "paymentStatus": "PENDING",
+  "items": [ {
+    "id": 1, "productId": 50, "sku": "SKU-1049", "name": "Keyboard",
+    "imageUrl": "/uploads/products/50.png",
+    "unitPrice": 99.00, "quantity": 2, "lineTotal": 198.00
+  } ],
+  "subtotal": 398.00, "shippingFee": 49.00, "total": 447.00,
+  "shippingAddress": {
+    "fullName": "Jay Pal", "phone": "9876543210",
+    "line1": "12 Palm Road", "line2": "Near Park",
+    "city": "Surat", "state": "Gujarat", "postalCode": "395007", "country": "IN"
+  },
+  "createdAt": "2026-10-23T15:20:00", "updatedAt": "2026-10-23T15:20:00"
+}
+```
+
+- `subtotal` = Σ `unitPrice × quantity` at checkout prices; `shippingFee` is flat
+  (`metashop.order.shipping-fee`, 49) and waived once the subtotal reaches
+  `metashop.order.free-shipping-threshold` (499); `total = subtotal + shippingFee`.
+- `items` carry the **frozen** product snapshot — a later price change never moves an order.
+- `shippingAddress` is a **snapshot** copied from auth-service's internal API at checkout.
+
+### Checkout flow (a saga, with compensation)
+
+1. Read the buyer's cart **through the buyer's own forwarded JWT** (D-061 — there is no internal
+   cart read) and run cart-service's pre-checkout validation. Empty cart → `422`; invalid cart →
+   `409` with the issues.
+2. Fetch the product snapshot for every line from product-service's internal batch API. A product
+   that vanished or was deactivated between the two calls → `422` (catalogue drift).
+3. Snapshot the shipping address from auth-service's internal API — a foreign address id is the
+   same `404` as a missing one.
+4. Persist the order as `CREATED` with the frozen money snapshot.
+5. Reserve stock via inventory-service's internal API, **idempotent per `orderId`** (D-053).
+   Out of stock → `409` with the unavailable lines, and the just-created order row is compensated
+   to `CANCELLED`. A downstream outage → `503`, same compensation.
+
+No Feign call runs inside a database transaction (D-062's rule, applied): the reads happen first,
+then one short write, then the reservation.
+
+### Status lifecycle
+
+```
+CREATED ──(payment succeeded, internal)──▶ CONFIRMED ──(admin)──▶ SHIPPED ──(admin)──▶ DELIVERED
+   │──(payment failed / owner cancel)──▶ CANCELLED
+```
+
+- `CONFIRMED` is **payment's job** (payment-service, next phase, via the internal callbacks) — an
+  admin cannot set it.
+- `CANCELLED` and `DELIVERED` are terminal. Anything illegal is a `422`.
+- A `CONFIRMED` (paid) order cannot be cancelled here — its stock is already sold and the refund
+  flow arrives with payment-service.
+
+### Internal (service-to-service) — for payment-service
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| POST | `/api/v1/internal/orders/{id}/payment-confirmed` | `X-Internal-Token` | `CREATED → CONFIRMED`, payment `PAID`, stock holds confirmed (become sales), buyer's cart cleared. Idempotent replay returns the confirmed order. |
+| POST | `/api/v1/internal/orders/{id}/payment-failed` | `X-Internal-Token` | `CREATED → CANCELLED`, payment `FAILED`, stock holds released. Idempotent replay. |
+
+Responses are plain JSON (no envelope, D-022). Not routed by the Gateway. An expired reservation
+(stock TTL ran out during payment) is reported back as a `422` — a real conflict payment-service
+must surface, not swallow.
+
+### Concurrency
+
+The `orders` row carries a `@Version` column: a racing payment callback and an admin update make
+the loser fail with a retryable `409` instead of double-transitioning — and because the payment
+callbacks are idempotent, the retry lands on the replay branch.
 
 ---
 

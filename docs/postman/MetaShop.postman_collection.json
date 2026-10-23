@@ -38,6 +38,10 @@
       "value": "http://localhost:8084"
     },
     {
+      "key": "orderUrl",
+      "value": "http://localhost:8085"
+    },
+    {
       "key": "internalToken",
       "value": "MetaShopDevOnlyInternalTokenChangeMe0123456789"
     }
@@ -2437,7 +2441,344 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Order Service",
+      "description": "Checkout and the order lifecycle (:8085). An order is created from the caller's cart — the only decision is the shipping address. Prices and the address are frozen as snapshots at checkout; stock is reserved through inventory-service (idempotent per orderId). The lifecycle is CREATED → CONFIRMED (payment) → SHIPPED → DELIVERED, with CANCELLED releasing the stock.",
+      "item": [
+        {
+          "name": "Checkout (JWT)",
+          "item": [
+            {
+              "name": "Create order from my cart",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/orders",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"shippingAddressId\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "List my orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/orders?page=0&size=20",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Get one order",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/orders/{{orderId}}",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders",
+                    "{{orderId}}"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Cancel my order (unpaid)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/orders/{{orderId}}/cancel",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders",
+                    "{{orderId}}",
+                    "cancel"
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Admin (ADMIN role)",
+          "item": [
+            {
+              "name": "List every user's orders",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/admin/orders?page=0&size=20",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "orders"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Ship a confirmed order",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/admin/orders/{{orderId}}/status",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "orders",
+                    "{{orderId}}",
+                    "status"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"SHIPPED\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guard rails",
+          "item": [
+            {
+              "name": "Checkout with an empty cart -> 422",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/orders",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"shippingAddressId\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "name": "Checkout without token -> 401",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/orders",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "orders"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"shippingAddressId\": 1\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Internal",
+          "item": [
+            {
+              "name": "Payment succeeded (payment-service)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Internal-Token",
+                    "value": "{{internalToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/internal/orders/{{orderId}}/payment-confirmed",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "internal",
+                    "orders",
+                    "{{orderId}}",
+                    "payment-confirmed"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Payment failed (payment-service)",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "X-Internal-Token",
+                    "value": "{{internalToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{orderUrl}}/api/v1/internal/orders/{{orderId}}/payment-failed",
+                  "host": [
+                    "{{orderUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "internal",
+                    "orders",
+                    "{{orderId}}",
+                    "payment-failed"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
-  "description": "MetaShop e-commerce API. Send everything through the API Gateway ({{gatewayUrl}}, :8080) — it validates the JWT, propagates X-User-* headers, adds X-Correlation-Id and rate limits the credential endpoints. The per-service folders ({{authUrl}} :8081, {{productUrl}} :8082, {{inventoryUrl}} :8083) are kept for direct debugging and service-to-service calls. Login first, then copy data.accessToken into the accessToken variable; service-to-service calls need the internalToken variable in X-Internal-Token."
+  "description": "MetaShop e-commerce API. Send everything through the API Gateway ({{gatewayUrl}}, :8080) — it validates the JWT, propagates X-User-* headers, adds X-Correlation-Id and rate limits the credential endpoints. The per-service folders ({{authUrl}} :8081, {{productUrl}} :8082, {{inventoryUrl}} :8083, {{cartUrl}} :8084, {{orderUrl}} :8085) are kept for direct debugging and service-to-service calls. Login first, then copy data.accessToken into the accessToken variable; service-to-service calls need the internalToken variable in X-Internal-Token."
 }

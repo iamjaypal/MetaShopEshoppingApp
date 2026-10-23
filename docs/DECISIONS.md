@@ -685,3 +685,86 @@ api-gateway is now at **28 tests** (route id + auth metadata assertion added).
 | `controller/CartControllerTest` | 12 | routing, DTO shape (no envelope), validation maps (400), 404 / 409 / 503 envelopes, totals rendering |
 | `controller/InternalCartControllerTest` | 1 | plain 204 delegation |
 | `CartServiceApplicationTests` | 1 | context load (Eureka off) |
+
+## D-066 — order-service scaffold normalised (D-039 applied)
+The Initializr scaffold nested in `order-service/metashop/` was flattened into `order-service/`
+and pinned to the platform versions: Spring Boot **4.1.0**, Java **21**, Spring Cloud **2025.1.3**,
+package `com.shopMeta.order_service`, artifact `order-service`, port **8085**, schema
+`metashop_order_db`. Dependencies mirror cart-service (openfeign, loadbalancer,
+circuitbreaker-resilience4j, aspectj, eureka, jjwt, flyway + flyway-mysql, springdoc) — Boot 4
+modular starters throughout.
+
+## D-067 — The order is a receipt: everything is a snapshot (spec 10.2)
+`orders` freezes the money (`subtotal`, `shipping_fee`, `total`) and the shipping address; each
+`order_items` row freezes `sku` / `name` / `image_url` / `unit_price`. Nothing on an order is a
+live reference — a price change, an image swap, an address edit or a product deletion tomorrow
+never rewrites history. The buyer's cart stays live (D-058); the order is where liveness stops.
+Money rules: flat `metashop.order.shipping-fee` (49), waived from
+`metashop.order.free-shipping-threshold` (499) subtotal upward.
+
+## D-068 — Checkout is a saga with compensation, and no Feign inside a transaction (D-062 applied)
+Downstream reads happen **before** any write, in this order: cart read + validation (with the
+buyer's forwarded JWT, D-061) → product snapshots (batch) → address snapshot → one short
+transaction persisting the `CREATED` order → stock reservation for the new `orderId` (idempotent
+per `orderId`, D-053). When the reservation fails — `409` out of stock or `503` outage — the
+freshly created row is **compensated to `CANCELLED`** so no order lingers without its reservation,
+and the business answer is rethrown (`OrderStore` keeps persistence separate from `OrderService`
+orchestration, exactly the `CartStore`/`CartService` split).
+
+## D-069 — The cart is read through the buyer's own JWT (D-061 applied)
+`CartSessionClient` calls cart-service's **public** `GET /api/v1/cart` and `POST /api/v1/cart/validate`
+with the caller's `Authorization` header forwarded by a **per-client** Feign configuration
+(`FeignUserTokenConfig`, deliberately not `@Configuration` so the interceptor cannot leak onto the
+other clients). The internal token goes out globally (`FeignInternalTokenConfig`); the two
+cart-service clients are split by `contextId` because they authenticate differently. There is no
+internal "read another user's cart" endpoint and none is wanted.
+
+## D-070 — The lifecycle is guarded by status rules + optimistic locking
+`CREATED → CONFIRMED → SHIPPED → DELIVERED`, with `CREATED → CANCELLED` for payment failure / owner
+cancel / admin cancel; `CANCELLED` and `DELIVERED` are terminal; every other transition is a `422`.
+The `orders` row carries a `@Version` column, so a racing payment callback and admin update fail
+the loser with a retryable `409`. Two deliberate restrictions: **admin cannot set `CONFIRMED`**
+(confirmation is payment's job) and **a paid order cannot be cancelled here** (inventory refuses to
+release a confirmed reservation — D-053's ledger — and refunds arrive with payment-service).
+
+## D-071 — Payment results enter through internal endpoints (built ahead of payment-service)
+`POST /api/v1/internal/orders/{id}/payment-confirmed` and `/payment-failed` (X-Internal-Token, plain
+JSON, unrouted — the D-041/D-022 conventions) are built now because payment-service (`:8086`) is the
+very next phase, the same reasoning as cart's internal clear (D-061). Both are **idempotent**: a
+replayed success returns the confirmed order, a replayed failure the cancelled one — no downstream
+calls on replay. Success confirms the stock (holds become sales) and then clears the cart best-effort:
+a cart-service hiccup must not fail an already-confirmed payment. Failure releases the stock **before**
+the status write, so a crash between the two leaves the order retryable rather than stranded.
+
+## D-072 — Downstream business answers do not feed the circuit breaker
+`ResilienceConfig` ignores `FeignException.FeignClientException` (4xx) at the breaker: a `409` out
+of stock or a `404` unknown address is a legitimate answer, not a sign the downstream service is
+unhealthy, and must not push the failure rate toward OPEN. The 4xx still propagate (wrapped in
+`DownstreamServiceException` by `call()`), and the typed wrappers unwrap the two that matter:
+inventory's reserve `409` becomes `InsufficientStockException` **with the offending lines parsed
+from the response body**, and auth's address `404` becomes `ResourceNotFoundException`. Five
+circuit breakers exist as beans (product / inventory / auth / cart + the shared retry) with one
+breaker per downstream service, so a flaky inventory cannot cut off address lookups too.
+
+## D-073 — Gateway routes for order-service
+Two routes added to `GatewayRoutesConfig` (the table grows per service, D-055/D-064):
+
+| Path | Target | Auth |
+|---|---|---|
+| `/api/v1/admin/orders/**` | `lb://order-service` | `ADMIN` |
+| `/api/v1/orders/**` | `lb://order-service` | `JWT` |
+
+`/api/v1/internal/orders/**` (the payment callbacks) has no route. api-gateway is now at **29 tests**
+(route id + auth metadata assertions added).
+
+## D-074 — order-service tests
+**57 tests**, all green, against a real MySQL (Flyway + `ddl-auto=validate` in the context test):
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `service/OrderServiceTest` | 28 | the checkout saga (happy path money snapshot + reserve call, free shipping, empty cart 422, blocked validation 409, catalogue drift 422, inactive 422, foreign address 404, reserve-409 and outage compensations), ownership 404s, admin read, cancel rules (release before write, paid order refused), every legal/illegal admin transition, payment callbacks incl. idempotent replays and the swallowed cart-clear failure |
+| `service/DownstreamClientsTest` | 12 | batch keyed by id, empty-request short circuit, retry-then-succeed, single-attempt non-retryable, 409 body parsing (+ garbage-body tolerance), reserve outage 503, expired-reservation 422 unwrap, address 404 unwrap, cart clear/load outage mapping |
+| `controller/OrderControllerTest` | 10 | checkout 201 shape, validation maps, 409 with the unavailable lines, blocked-checkout 409, 503 honesty, paged list, order read, 404 envelope, cancel mapping |
+| `controller/AdminOrderControllerTest` | 3 | admin list with status filter, ship transition, illegal transition 422 |
+| `controller/InternalOrderControllerTest` | 3 | payment result callbacks, plain JSON (no envelope), 404 mapping |
+| `OrderServiceApplicationTests` | 1 | context load (Eureka off) |

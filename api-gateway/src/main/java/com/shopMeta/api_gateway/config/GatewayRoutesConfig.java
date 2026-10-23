@@ -18,7 +18,7 @@ import org.springframework.context.annotation.Configuration;
  * so the JWT filter does not have to hard-code path rules.
  *
  * <p>Only services that are actually deployed get a route: auth-service, product-service,
- * inventory-service and cart-service today. Routes for order-service and payment-service are added
+ * inventory-service, cart-service and order-service today. Routes for payment-service are added
  * as those services land. {@code /api/v1/internal/**} is deliberately <em>not</em> routed: internal,
  * service-to-service endpoints must never be reachable from the outside (spec 5.4 / 19).
  */
@@ -78,6 +78,20 @@ public class GatewayRoutesConfig {
                         .path("/api/v1/cart/**")
                         .metadata(METADATA_KEY, JWT.name())
                         .uri("lb://cart-service"))
+
+                // ---------- order-service (:8085) ----------
+                // Checkout and the buyer's order history are user-scoped (JWT); fulfilment is
+                // admin-only. /api/v1/internal/orders/** (the payment-result callbacks) stays
+                // unrouted — payment-service calls order-service directly.
+                .route("order-service-admin", r -> r
+                        .path("/api/v1/admin/orders/**")
+                        .metadata(METADATA_KEY, ADMIN.name())
+                        .uri("lb://order-service"))
+
+                .route("order-service", r -> r
+                        .path("/api/v1/orders/**")
+                        .metadata(METADATA_KEY, JWT.name())
+                        .uri("lb://order-service"))
 
                 .build();
     }

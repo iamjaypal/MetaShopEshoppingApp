@@ -14,7 +14,7 @@ Foundational choices and deviations are recorded in [`docs/DECISIONS.md`](docs/D
 | **api-gateway** | **8080** | ✅ complete (see below) |
 | **inventory-service** | **8083** | ✅ complete (see below) |
 | **cart-service** | **8084** | ✅ complete (see below) |
-| order-service | 8085 | ⬜ scaffold only |
+| **order-service** | **8085** | ✅ complete (see below) |
 | payment-service | 8086 | ⬜ scaffold only |
 | notification-service | 8087 | ⬜ not started |
 
@@ -31,7 +31,8 @@ MetaShop/
 ├── auth-service/               # auth / users         (:8081) — complete
 ├── product-service/            # catalog              (:8082) — complete
 ├── inventory-service/          # stock & reservations (:8083) — complete
-└── cart-service/               # shopping cart        (:8084) — complete
+├── cart-service/               # shopping cart        (:8084) — complete
+└── order-service/              # checkout & orders    (:8085) — complete
 ```
 
 > Runtime versions are pinned to what is already in use: **Java 21** and **Spring Boot 4.1.0**
@@ -42,7 +43,7 @@ MetaShop/
 
 ## Running the stack
 
-Start the six services in this order (each in its own terminal, from the repo root):
+Start the seven services in this order (each in its own terminal, from the repo root):
 
 ```bash
 cd discovery-server   && ./mvnw spring-boot:run   # :8761  registry (start first)
@@ -50,19 +51,20 @@ cd auth-service       && ./mvnw spring-boot:run   # :8081
 cd product-service    && ./mvnw spring-boot:run   # :8082
 cd inventory-service  && ./mvnw spring-boot:run   # :8083
 cd cart-service       && ./mvnw spring-boot:run   # :8084
+cd order-service      && ./mvnw spring-boot:run   # :8085
 cd api-gateway        && ./mvnw spring-boot:run   # :8080  public entry point (start last)
 ```
 
 Then:
 
 - Eureka dashboard: http://localhost:8761/ — should list `API-GATEWAY`, `AUTH-SERVICE`,
-  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`, `CART-SERVICE`
+  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`, `CART-SERVICE`, `ORDER-SERVICE`
 - Gateway route table: http://localhost:8080/actuator/gateway/routes
 - Everything goes through **http://localhost:8080** — e.g.
   `curl http://localhost:8080/api/v1/products?size=2`
 
 The gateway resolves services from Eureka, so it needs a service to have registered **and** its own
-registry cache to have refreshed (30 s by default). On a cold start allow ~30–60 s after all five
+registry cache to have refreshed (30 s by default). On a cold start allow ~30–60 s after all six
 are up before the first routed call.
 
 > Internal, service-to-service endpoints (`/api/v1/internal/**`) are **not** routed by the gateway
@@ -141,6 +143,8 @@ Requires discovery-server plus at least one downstream service to be running.
 | `/api/v1/admin/inventory/**` | `lb://inventory-service` | ADMIN |
 | `/api/v1/inventory/**` | `lb://inventory-service` | Public |
 | `/api/v1/cart/**` | `lb://cart-service` | JWT |
+| `/api/v1/admin/orders/**` | `lb://order-service` | ADMIN |
+| `/api/v1/orders/**` | `lb://order-service` | JWT |
 | `/api/v1/internal/**` | — | **not routed** (404) |
 
 ### Configuration
@@ -178,7 +182,7 @@ Requires discovery-server plus at least one downstream service to be running.
 
 ```bash
 cd api-gateway
-./mvnw test                    # 26 tests
+./mvnw test                    # 29 tests
 ```
 
 Route table, JWT filter (public/JWT/ADMIN, bad tokens, identity propagation, spoof stripping),
@@ -566,4 +570,105 @@ once onto the update branch (D-063). Racing cart-row mutations make the loser fa
 ### Still to do (later phases)
 - `CartClearedEvent` publishing (Kafka) — §14
 - Guest carts, once the platform defines an anonymous identity (D-059)
+- Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
+
+---
+
+## order-service
+
+Checkout and the order lifecycle (spec §11). An order is created **from the caller's cart** — the
+only decision in the request is which saved address to ship to. Prices, sku/name/image and the
+shipping address are **frozen as snapshots at checkout**, so the order is the receipt and never
+moves when the catalogue or the address book changes afterwards (D-067).
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Data JPA (Hibernate 7) · MySQL 8 · **Flyway** · Spring Security
+(JWT verification + internal-token filter) · Eureka client · **OpenFeign + Spring Cloud LoadBalancer
++ Resilience4j** (retry + a circuit breaker per downstream service) · Lombok · springdoc-openapi
+(Swagger UI) · JUnit 5 + Mockito + MockMvc.
+
+### Prerequisites
+- Java 21
+- MySQL 8 running on `localhost:3306` with a `root` user (dev credentials in
+  `src/main/resources/application.properties`)
+- auth-service (`:8081`), product-service (`:8082`), inventory-service (`:8083`) and cart-service
+  (`:8084`) reachable — checkout reads all four
+
+Create the (empty) schema once; Flyway creates all tables:
+
+```sql
+CREATE DATABASE metashop_order_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Run
+
+```bash
+cd order-service
+./mvnw spring-boot:run         # starts on :8085
+```
+
+- Swagger UI: http://localhost:8085/swagger-ui/index.html
+- OpenAPI JSON: http://localhost:8085/v3/api-docs
+
+### Test
+
+```bash
+cd order-service
+./mvnw test
+```
+
+57 tests. MySQL must be reachable: the context test runs Flyway + Hibernate validation.
+
+### API
+
+Full reference in [`docs/API.md`](docs/API.md). Highlights:
+
+| Area | Endpoints |
+|---|---|
+| Checkout | `POST /api/v1/orders` — body `{shippingAddressId}`; builds the order from the caller's cart, freezes the snapshots, reserves stock → `201` |
+| Read | `GET /api/v1/orders` (paged), `GET /api/v1/orders/{id}` (owner or admin) |
+| Customer | `POST /api/v1/orders/{id}/cancel` — while `CREATED`; releases the stock |
+| Admin | `GET /api/v1/admin/orders` (`?status=`), `POST /api/v1/admin/orders/{id}/status` (`SHIPPED` / `DELIVERED` / `CANCELLED`) |
+| Internal | `POST /api/v1/internal/orders/{id}/payment-confirmed` / `payment-failed` — payment-service's callbacks (D-071), built ahead of that phase |
+
+### Checkout saga (D-068)
+
+Cart read + validation with the **buyer's own forwarded JWT** (D-069) → product snapshots → address
+snapshot → one transaction persisting `CREATED` → stock reservation (idempotent per `orderId`).
+Any failure at reserve time compensates the order to `CANCELLED` and rethrows the honest answer:
+`409` with the unavailable lines, or `503` for an outage. No Feign call runs inside a transaction.
+
+### Status lifecycle
+
+`CREATED → CONFIRMED → SHIPPED → DELIVERED`, `CREATED → CANCELLED`; `CANCELLED` / `DELIVERED`
+terminal. `CONFIRMED` is payment's job, not an admin's; a paid order is not cancellable here
+(refunds arrive with payment-service). Illegal transitions are `422`; racing writers are decided by
+the `@Version` column with a retryable `409` (D-070).
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `server.port` | `8085` | spec §3.1 |
+| `spring.datasource.url` | `jdbc:mysql://localhost:3306/metashop_order_db` | |
+| `eureka.client.service-url.defaultZone` | `http://localhost:8761/eureka` | env `EUREKA_URL` |
+| `metashop.jwt.secret` | dev key | **must equal auth-service's**; env `JWT_SECRET` |
+| `metashop.jwt.issuer` | `metashop-auth-service` | |
+| `metashop.internal.token` | dev token | env `INTERNAL_TOKEN`; guards `/api/v1/internal/orders/**` and signs outbound Feign calls |
+| `metashop.order.shipping-fee` | `49` | flat fee, waived above the threshold |
+| `metashop.order.free-shipping-threshold` | `499` | subtotal from which shipping is free |
+| `metashop.resilience.*` | 3 attempts, 10-call window | retry + circuit-breaker tuning (D-062/D-072) |
+| `spring.cloud.openfeign.client.config.default.*` | 2 s connect / 5 s read | the downstream timeout |
+
+### Database migrations
+
+`src/main/resources/db/migration/V1__init.sql` creates `orders` (money + address snapshots, `CHECK`
+constraints on both enums) and `order_items` (the frozen product snapshots). Hibernate runs with
+`ddl-auto=validate`.
+
+### Still to do (later phases)
+- `payment-confirmed` / `payment-failed` become real calls once **payment-service** (`:8086`) lands —
+  the endpoints already exist and are idempotent (D-071)
+- `OrderCreatedEvent` / `OrderConfirmedEvent` publishing (Kafka) — §14, D-019
+- A refund-aware cancellation for paid orders (payment-service + admin)
 - Actuator (`health`, `info`, `metrics`, `prometheus`) + Dockerfile — deployment phase
