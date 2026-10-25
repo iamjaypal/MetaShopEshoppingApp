@@ -126,6 +126,14 @@ class GatewayRoutesConfigTest {
     }
 
     @Test
+    void theNotificationLogIsAdminOnly() {
+        Route route = routes().get("notification-service-admin");
+        assertThat(route).isNotNull();
+        assertThat(route.getUri().toString()).isEqualTo("lb://notification-service");
+        assertThat(route.getMetadata().get(METADATA_KEY)).isEqualTo(ADMIN.name());
+    }
+
+    @Test
     void internalEndpointsAreNeverRouted() {
         assertThat(routeLocator.getRoutes().collectList().block())
                 .noneMatch(route -> route.getPredicate() != null

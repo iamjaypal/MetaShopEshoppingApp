@@ -18,10 +18,9 @@ import org.springframework.context.annotation.Configuration;
  * so the JWT filter does not have to hard-code path rules.
  *
  * <p>Only services that are actually deployed get a route: auth-service, product-service,
- * inventory-service, cart-service, order-service and payment-service today. Routes for
- * notification-service are added as those services land. {@code /api/v1/internal/**} is
- * deliberately <em>not</em> routed: internal, service-to-service endpoints must never be reachable
- * from the outside (spec 5.4 / 19).
+ * inventory-service, cart-service, order-service, payment-service and notification-service today.
+ * {@code /api/v1/internal/**} is deliberately <em>not</em> routed: internal, service-to-service
+ * endpoints must never be reachable from the outside (spec 5.4 / 19).
  */
 @Configuration
 public class GatewayRoutesConfig {
@@ -106,6 +105,14 @@ public class GatewayRoutesConfig {
                         .path("/api/v1/payments/**")
                         .metadata(METADATA_KEY, JWT.name())
                         .uri("lb://payment-service"))
+
+                // ---------- notification-service (:8087) ----------
+                // The service is driven entirely by Kafka; its only HTTP surface is the admin
+                // notification log (spec 13), so this is the only route it gets.
+                .route("notification-service-admin", r -> r
+                        .path("/api/v1/admin/notifications/**")
+                        .metadata(METADATA_KEY, ADMIN.name())
+                        .uri("lb://notification-service"))
 
                 .build();
     }
