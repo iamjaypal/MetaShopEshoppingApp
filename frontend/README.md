@@ -1,15 +1,16 @@
 # MetaShop — frontend (Angular)
 
 The MetaShop web client: an Angular 21 (standalone, signals, zoneless) single-page app that talks
-to the microservices stack **through the API gateway** (`http://localhost:8080`), which is also
-where CORS for this app's origin (`http://localhost:4200`) is configured.
+to the microservices stack **through the API gateway** (`http://localhost:8080`). In development all
+calls go same-origin to the dev server, which **proxies `/api` to the gateway** via
+`proxy.conf.json` (CORS is also allowed on the gateway for `http://localhost:4200` as a fallback).
 
 ## Run
 
 ```bash
 cd frontend
 pnpm install
-pnpm start            # = ng serve, on http://localhost:4200
+pnpm start            # ng serve with the /api → :8080 proxy, on http://localhost:4200
 ```
 
 `pnpm` is the package manager this workspace uses (system `npm` 9.2.0 hits an npm bug with

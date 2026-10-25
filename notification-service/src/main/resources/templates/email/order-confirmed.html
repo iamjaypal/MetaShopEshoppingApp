@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Order confirmed</title>
+    <th:block th:replace="~{email/fragments :: styles}"></th:block>
+</head>
+<body>
+<div class="wrapper">
+    <div th:replace="~{email/fragments :: header}"></div>
+
+    <div class="card">
+        <h1>Thanks, <span th:text="${greetingName}">there</span> — your order is confirmed</h1>
+
+        <p>We have received your payment and order <strong th:text="${orderNumber}">MS-000000</strong>
+            is now being prepared.</p>
+
+        <table>
+            <thead>
+            <tr>
+                <th>Item</th>
+                <th class="right">Qty</th>
+                <th class="right">Price</th>
+                <th class="right">Total</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="item : ${items}">
+                <td th:text="${item.name}">Product name</td>
+                <td class="right" th:text="${item.quantity}">1</td>
+                <td class="right" th:text="${item.unitPrice}">&#8377;0.00</td>
+                <td class="right" th:text="${item.lineTotal}">&#8377;0.00</td>
+            </tr>
+            <tr>
+                <td colspan="3" class="right total">Total paid</td>
+                <td class="right total" th:text="${total}">&#8377;0.00</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        <div class="panel">
+            <p class="muted">Shipping to</p>
+            <p th:text="${shippingAddress.fullName}">Customer name</p>
+            <p th:text="${shippingAddress.line1}">Address line 1</p>
+            <p th:if="${shippingAddress.line2 != null and !#strings.isEmpty(shippingAddress.line2)}"
+               th:text="${shippingAddress.line2}">Address line 2</p>
+            <p>
+                <span th:text="${shippingAddress.city}">City</span>,
+                <span th:text="${shippingAddress.state}">State</span>
+                <span th:text="${shippingAddress.postalCode}">000000</span>
+            </p>
+            <p th:text="${shippingAddress.country}">Country</p>
+            <p th:if="${shippingAddress.phone != null and !#strings.isEmpty(shippingAddress.phone)}">
+                Phone: <span th:text="${shippingAddress.phone}">0000000000</span>
+            </p>
+        </div>
+
+        <p>
+            <a class="btn" th:href="${orderUrl}">View your order</a>
+        </p>
+    </div>
+
+    <div th:replace="~{email/fragments :: footer}"></div>
+</div>
+</body>
+</html>

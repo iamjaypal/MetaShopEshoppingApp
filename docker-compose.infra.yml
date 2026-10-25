@@ -1,0 +1,117 @@
+# MetaShop shared infrastructure (spec section 16 / Phase 0).
+#
+#   docker compose -f docker-compose.infra.yml up -d
+#
+# Brings up the three things the services cannot run without but that a laptop does not
+# already have:
+#
+#   kafka    :9092  event backbone for Phase 8 (spec 14)
+#   mailpit  :1025  SMTP sink,  :8025  web UI to read the captured mail (spec 13)
+#   redis    :6379  cache / gateway rate limiting (spec 5.8, 6.2)
+#
+# MySQL is NOT in the default set on purpose: every service on this machine already points at
+# the host MySQL on 3306, so starting a second one there would fail to bind. A containerised
+# MySQL is available under the `mysql` profile on host port 3307 if you want an isolated
+# instance:
+#
+#   docker compose -f docker-compose.infra.yml --profile mysql up -d
+#
+# Nothing here is required by the frontend; the Angular dev server talks to the gateway on 8080.
+
+name: metashop-infra
+
+services:
+
+  # --- Kafka (KRaft, single node, no ZooKeeper) ------------------------------
+  # 3 partitions per auto-created topic to match spec 14.1. Plaintext listener advertised as
+  # localhost:9092 so the services, which run on the host, can reach it.
+  kafka:
+    image: apache/kafka:3.9.0
+    container_name: metashop-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_NUM_PARTITIONS: 3
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    volumes:
+      - metashop-kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # --- Mailpit (Mailhog's successor) ----------------------------------------
+  # SMTP on 1025 is what notification-service sends to; 8025 is the UI where the mails land,
+  # so "did the welcome email actually go out?" is answerable without a real mail provider.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: metashop-mailpit
+    ports:
+      - "1025:1025"   # SMTP
+      - "8025:8025"   # web UI / API
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+      MP_MAX_MESSAGES: "500"
+    restart: unless-stopped
+
+  # --- Redis ---------------------------------------------------------------
+  # Reserved for the catalogue cache and the gateway rate limiter (both still in-memory today).
+  redis:
+    image: redis:7-alpine
+    container_name: metashop-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - metashop-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    restart: unless-stopped
+
+  # --- Optional isolated MySQL ---------------------------------------------
+  # Only for a machine that does not already run MySQL on 3306.
+  mysql:
+    image: mysql:8.0
+    container_name: metashop-mysql
+    profiles: ["mysql"]
+    ports:
+      - "3307:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root123
+      MYSQL_ROOT_HOST: "%"
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    volumes:
+      - metashop-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot123"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  metashop-kafka-data:
+  metashop-redis-data:
+  metashop-mysql-data:

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Low stock alert</title>
+    <th:block th:replace="~{email/fragments :: styles}"></th:block>
+</head>
+<body>
+<div class="wrapper">
+    <div th:replace="~{email/fragments :: header}"></div>
+
+    <div class="card">
+        <p><span class="status status-warn">Operational alert</span></p>
+
+        <h1>Stock is running low</h1>
+
+        <p>This is an internal MetaShop alert. It is sent to the operator address because a stock
+            threshold has been crossed and no customer is involved.</p>
+
+        <div class="panel">
+            <p class="muted">Product id</p>
+            <p th:text="${productId}">1</p>
+            <p class="muted">SKU</p>
+            <p th:text="${sku}">SKU-0001</p>
+            <p class="muted">Available now</p>
+            <p class="total" th:text="${available}">0</p>
+        </div>
+
+        <p>Restock it from the admin inventory screen before the next order arrives.</p>
+    </div>
+
+    <div th:replace="~{email/fragments :: footer}"></div>
+</div>
+</body>
+</html>

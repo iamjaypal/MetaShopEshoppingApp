@@ -16,13 +16,19 @@ Foundational choices and deviations are recorded in [`docs/DECISIONS.md`](docs/D
 | **cart-service** | **8084** | ✅ complete (see below) |
 | **order-service** | **8085** | ✅ complete (see below) |
 | **payment-service** | **8086** | ✅ complete (see below) |
-| notification-service | 8087 | ⬜ not started |
-| **frontend** | **4200** | 🟨 phase F3 (product listing + detail) complete — see `frontend/README.md` |
+| **notification-service** | **8087** | ✅ complete (see below) |
+| **frontend** | **4200** | ✅ **complete (F1–F6)** — storefront + admin console, see `frontend/README.md` |
+
+All nine backend services are complete. The one piece of spec §14 not yet wired is **event
+production**: the services that own the domain events (auth, order, payment, inventory) do not
+publish them to Kafka yet, so notification-service currently only receives what is published to the
+broker by hand (see its section below). That is the next phase.
 
 ## Repository layout
 
 ```
 MetaShop/
+├── docker-compose.infra.yml    # Kafka + Mailpit + Redis (dev infrastructure)
 ├── docs/
 │   ├── DECISIONS.md            # design decisions & spec deviations
 │   ├── API.md                  # API reference
@@ -35,8 +41,8 @@ MetaShop/
 ├── cart-service/               # shopping cart        (:8084) — complete
 ├── order-service/              # checkout & orders    (:8085) — complete
 ├── payment-service/            # payment ledger       (:8086) — complete
-├── notification-service/       # notifications        (:8087) — not started
-└── frontend/                   # Angular web client   (:4200) — phase F3 (listing + detail)
+├── notification-service/       # notifications        (:8087) — complete
+└── frontend/                   # Angular web client   (:4200) — ✅ complete (storefront + admin)
 ```
 
 > Runtime versions are pinned to what is already in use: **Java 21** and **Spring Boot 4.1.0**
@@ -47,7 +53,14 @@ MetaShop/
 
 ## Running the stack
 
-Start the eight services in this order (each in its own terminal, from the repo root):
+Start the shared dev infrastructure first (Kafka, Mailpit, Redis — see D-080):
+
+```bash
+docker compose -f docker-compose.infra.yml up -d
+# Kafka :9092 · Mailpit SMTP :1025 / UI :8025 · Redis :6379
+```
+
+Then the nine services in this order (each in its own terminal, from the repo root):
 
 ```bash
 cd discovery-server   && ./mvnw spring-boot:run   # :8761  registry (start first)
@@ -57,6 +70,7 @@ cd inventory-service  && ./mvnw spring-boot:run   # :8083
 cd cart-service       && ./mvnw spring-boot:run   # :8084
 cd order-service      && ./mvnw spring-boot:run   # :8085
 cd payment-service    && ./mvnw spring-boot:run   # :8086
+cd notification-service && ./mvnw spring-boot:run # :8087  (needs Kafka + Mailpit)
 cd api-gateway        && ./mvnw spring-boot:run   # :8080  public entry point (start last)
 cd frontend           && pnpm start               # :4200  web client (any time after the gateway)
 ```
@@ -64,13 +78,15 @@ cd frontend           && pnpm start               # :4200  web client (any time 
 Then:
 
 - Eureka dashboard: http://localhost:8761/ — should list `API-GATEWAY`, `AUTH-SERVICE`,
-  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`, `CART-SERVICE`, `ORDER-SERVICE`, `PAYMENT-SERVICE`
+  `PRODUCT-SERVICE`, `INVENTORY-SERVICE`, `CART-SERVICE`, `ORDER-SERVICE`, `PAYMENT-SERVICE`,
+  `NOTIFICATION-SERVICE`
 - Gateway route table: http://localhost:8080/actuator/gateway/routes
+- Sent emails: http://localhost:8025 (Mailpit inbox)
 - Everything goes through **http://localhost:8080** — e.g.
   `curl http://localhost:8080/api/v1/products?size=2`
 
 The gateway resolves services from Eureka, so it needs a service to have registered **and** its own
-registry cache to have refreshed (30 s by default). On a cold start allow ~30–60 s after all eight
+registry cache to have refreshed (30 s by default). On a cold start allow ~30–60 s after all nine
 are up before the first routed call.
 
 > Internal, service-to-service endpoints (`/api/v1/internal/**`) are **not** routed by the gateway
@@ -764,7 +780,151 @@ Full reference in [`docs/API.md`](docs/API.md). Highlights:
 
 ---
 
+## notification-service
+
+The event consumer and email sender (spec §13). It has **no outbound HTTP calls at all** — no Feign,
+no LoadBalancer, no internal-token filter — because its only HTTP surface is the admin notification
+log. Everything it does is driven by Kafka: a domain event arrives, is mapped to one of ten
+Thymeleaf templates, rendered to HTML, recorded in `notifications`, and sent through Spring Mail.
+Kafka delivers at least once, so every event is de-duplicated by `event_id` before anything is sent,
+and a delivery that keeps failing is retried with backoff and then dead-lettered (D-082).
+
+### Tech
+Spring Boot 4.1.0 · Java 21 · Spring Data JPA (Hibernate 7) · MySQL 8 · **Flyway** ·
+**Spring Kafka** (manual acks, `DefaultErrorHandler` + exponential backoff + DLT,
+`ErrorHandlingDeserializer`) · **Spring Mail** (Mailpit in dev) · **Thymeleaf** HTML email templates ·
+Spring Security (JWT verification) · Eureka client · Lombok · springdoc-openapi (Swagger UI) ·
+JUnit 5 + Mockito + MockMvc + `spring-kafka-test` (embedded broker).
+
+### Prerequisites
+- Java 21
+- MySQL 8 running on `localhost:3306` with a `root` user (dev credentials in
+  `src/main/resources/application.properties`)
+- Kafka on `localhost:9092` and Mailpit on `localhost:1025` / `http://localhost:8025`:
+  `docker compose -f docker-compose.infra.yml up -d`
+
+Create the (empty) schema once; Flyway creates all tables:
+
+```sql
+CREATE DATABASE metashop_notification_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+```
+
+### Run
+
+```bash
+cd notification-service
+./mvnw spring-boot:run
+```
+
+Swagger UI: http://localhost:8087/swagger-ui.html · Sent email: http://localhost:8025
+
+The four topics are **not** declared as `NewTopic` beans on purpose: they rely on the broker's
+auto-create with `KAFKA_NUM_PARTITIONS=3`, so `KafkaAdmin` never opens a connection at startup and
+the test suite stays hermetic (D-082).
+
+### Configuration
+
+| Property | Default | Notes |
+|---|---|---|
+| `server.port` | `8087` | spec §3.1 |
+| `spring.datasource.url` | `jdbc:mysql://localhost:3306/metashop_notification_db` | |
+| `spring.kafka.bootstrap-servers` | `localhost:9092` | env `KAFKA_BOOTSTRAP_SERVERS` |
+| `spring.kafka.consumer.group-id` | `notification-service` | one group across all four topics |
+| `spring.kafka.listener.ack-mode` | `manual_immediate` | spec §14.4; ack only after the row is `SENT` |
+| `spring.mail.host` / `spring.mail.port` | `localhost` / `1025` | env `MAIL_HOST` / `MAIL_PORT`; Mailpit in dev |
+| `metashop.notification.from-address` | `no-reply@metashop.com` | env `MAIL_FROM` |
+| `metashop.notification.admin-email` | `admin@metashop.com` | low-stock alerts have no owning user (env `NOTIFICATION_ADMIN_EMAIL`) |
+| `metashop.notification.frontend-base-url` | `http://localhost:4200` | links inside emails point at the Angular app (env `FRONTEND_BASE_URL`) |
+| `metashop.notification.dlt-suffix` | `.DLT` | spec §14.1 names `*.DLT`; the recoverer's own default is `-dlt` |
+| `metashop.notification.retry-max-attempts` | `3` | spec §13: three retries, then the dead-letter topic |
+| `metashop.notification.retry-initial-interval` | `1s` | doubles each attempt (1s / 2s / 4s) |
+| `metashop.notification.retry-multiplier` | `2.0` | |
+| `metashop.notification.retry-max-interval` | `10s` | ceiling, so the backoff cannot grow without bound |
+| `metashop.jwt.secret` | dev key | **must equal auth-service's**; env `JWT_SECRET` |
+
+### Database migrations
+
+`src/main/resources/db/migration/V1__init.sql` creates `notifications` (the audit log, with the
+added `event_id` unique column — D-080) and `processed_events` (the de-duplication table, identical
+to the one in inventory/order/payment). Hibernate runs with `ddl-auto=validate`.
+
+### Test
+
+```bash
+cd notification-service
+./mvnw test
+```
+
+57 tests. MySQL must be reachable: the context test runs Flyway + Hibernate validation. The Kafka
+tests start their **own embedded broker**, so no `docker compose` is needed to run the suite.
+
+### API
+
+Full reference in [`docs/API.md`](docs/API.md). Admin only (`ROLE_ADMIN`):
+
+| Area | Endpoints |
+|---|---|
+| List | `GET /api/v1/admin/notifications` — paged, newest first, `?status=PENDING\|SENT\|FAILED`, `?page=`, `?size=` |
+| Detail | `GET /api/v1/admin/notifications/{id}` — includes the rendered HTML `body` |
+| Retry | `POST /api/v1/admin/notifications/{id}/retry` — re-sends from the stored subject/body; `422` if already `SENT`, `503` if the mail server refuses again |
+
+### Events → emails
+
+Consumes `user.events`, `order.events`, `payment.events`, `inventory.events` (spec §14.1).
+
+| Event | Notification type | Template |
+|---|---|---|
+| `UserRegisteredEvent` | `WELCOME` | `welcome` |
+| `PasswordResetRequestedEvent` | `PASSWORD_RESET` | `password-reset` |
+| `OrderConfirmedEvent` | `ORDER_CONFIRMED` | `order-confirmed` (line items + shipping address) |
+| `OrderShippedEvent` | `ORDER_SHIPPED` | `order-shipped` |
+| `OrderDeliveredEvent` | `ORDER_DELIVERED` | `order-delivered` |
+| `OrderCancelledEvent` | `ORDER_CANCELLED` | `order-cancelled` |
+| `PaymentSuccessEvent` | `PAYMENT_SUCCESS` | `payment-success` (receipt) |
+| `PaymentFailedEvent` | `PAYMENT_FAILED` | `payment-failed` |
+| `PaymentRefundedEvent` | `PAYMENT_REFUNDED` | `payment-refunded` |
+| `InventoryLowEvent` | `LOW_STOCK` | `low-stock` → the **admin** address, not a customer |
+
+Any other event type on those topics (`OrderCreatedEvent`, `StockReservedEvent`, …) is a logged
+skip, not a failure — which is why the consumer tolerates the whole topic rather than a filtered
+subset.
+
+> **Known gap (D-081).** The three payment events carry no email address in the spec's payload, and
+> no service can resolve user-id → email. They now accept an **optional `email` field**; an event
+> without one is logged and skipped rather than dead-lettered, so a producer cannot poison the topic.
+> The permanent fix is for payment-service to carry the address onto its events.
+
+### Try it locally
+
+Nothing in the other services publishes to Kafka yet, so drive the consumer by hand:
+
+```bash
+# publish one event (Mailpit at :8025 shows the result)
+printf '%s\n' '{"eventId":"demo-1","eventType":"OrderConfirmedEvent","occurredAt":"2026-01-01T10:00:00Z","version":1,"payload":{"orderId":42,"orderNumber":"MS-000042","userId":7,"email":"asha@example.com","items":[{"productId":1,"sku":"SKU-1","name":"Wireless Mouse","unitPrice":1299.00,"quantity":2,"lineTotal":2598.00}],"total":2598.00,"shippingAddress":{"fullName":"Asha Rao","phone":"9876543210","line1":"12 MG Road","line2":null,"city":"Bengaluru","state":"KA","postalCode":"560001","country":"India"}}}' \
+  | docker exec -i metashop-kafka /opt/kafka/bin/kafka-console-producer.sh \
+      --bootstrap-server localhost:9092 --topic order.events
+
+# check the audit log (admin token required)
+curl -s -H "Authorization: Bearer $ADMIN_TOKEN" \
+  'http://localhost:8080/api/v1/admin/notifications?status=SENT'
+```
+
+`kafka-console-producer` sends **one record per line**, so the payload must be a single line — a
+pretty-printed JSON body is published as several unparseable fragments (which is exactly how the
+missing `ErrorHandlingDeserializer` was found, D-082).
+
+### Still to do (later phases)
+- **Kafka producers in the owning services** (auth, order, payment, inventory) — the event catalogue
+  in spec §14 is defined but not yet published, so notification-service has nothing real to consume
+- The payment-service producer change that fills in the optional `email` (D-081)
+- Actuator (`metrics`, `prometheus`) + Dockerfile — deployment phase
+- A `@Scheduled` sweeper for notifications stuck in `PENDING` after a crash mid-send
+
+---
+
 ## frontend
+
+
 
 The web client (spec 2): an **Angular 21** single-page app — standalone components, signals,
 zoneless change detection — talking to the stack through the API gateway (which already allows the

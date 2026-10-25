@@ -823,3 +823,110 @@ api-gateway is now at **30 tests**.
 | `controller/PaymentControllerTest` | 9 | pay 201 captured / 200 declined shapes, validation map, 422/404/503 mappings, reads, paged list |
 | `controller/AdminPaymentControllerTest` | 2 | status and order filters |
 | `PaymentServiceApplicationTests` | 1 | context load (Eureka off) |
+
+## D-080 — notification-service: the last backend service, and two deliberate schema deviations
+notification-service (`:8087`, `com.shopMeta.notification_service`, schema `metashop_notification_db`,
+port `8087`) is a **pure consumer**: it has no outbound HTTP calls, no Feign, no LoadBalancer, no
+Resilience4j and no `X-Internal-Token` filter, because it exposes no internal HTTP surface at all.
+Its entire API is `GET /api/v1/admin/notifications` (paged, optional `status` filter),
+`GET /api/v1/admin/notifications/{id}` and `POST /api/v1/admin/notifications/{id}/retry`, all
+`ROLE_ADMIN` (spec 13). The only dependency it added over the other services is
+`spring-boot-starter-mail` + `spring-boot-starter-thymeleaf`.
+
+Two deviations from the spec 13 column list, both recorded here rather than silently:
+
+- **`notifications.event_id VARCHAR(64) NULL UNIQUE`** (not in the spec). Without it a redelivery
+  cannot be distinguished from a new event, so a retried record would insert a *second* row and send
+  the email twice. With it, `preparePending` reuses the existing row and the send stays idempotent.
+  It is nullable and the index is unique, so rows that come from no event (there are none today)
+  would not collide.
+- **`status` is `VARCHAR(20)` + `CHECK`, not `ENUM`** — the same reasoning as D-049.
+- `processed_events` reuses the **exact** shape already created in inventory-service, order-service
+  and payment-service (`event_id VARCHAR(64) PK, event_type VARCHAR(80) NULL, processed_at DATETIME`),
+  so the Kafka phase sees one consistent contract across four services.
+
+`body TEXT` holds the **rendered** HTML, written once at first render and never regenerated. A retry
+therefore replays exactly what the customer would have received, and an admin can read it back
+through the detail endpoint — which is the answer to "what did the customer actually get?".
+
+## D-081 — the hole the event catalogue leaves: payment events carry no email
+`PaymentSuccessEvent` / `PaymentFailedEvent` / `PaymentRefundedEvent` (spec 14.3) have no email field,
+`OrderResponse` has none either, and auth-service exposes no user-id → email lookup (its only internal
+endpoint is an address read). So a payment email is **not** deliverable from the events as specified.
+
+Resolved by taking the backward-compatible option the spec already allows for payload additions
+(spec 14.4 versioning): an **optional `email` field** on the three payment payloads. A payment event
+that arrives without an address is **logged and skipped, never failed** — a poison pill here would
+stall the topic, and the notification service must not be the reason a producer cannot ship. The
+permanent fix is a producer-side change: payment-service must carry the address onto its events (it
+can obtain it from the order snapshot it already reads). Recorded as required future work, not
+worked around with a Feign call from this service.
+
+## D-082 — the consumer contract: manual ack, one retry layer, and a bug only a live broker showed
+The consumer is one `@KafkaListener` on four topics (`user.events`, `order.events`, `payment.events`,
+`inventory.events`) sharing the `notification-service` group, so one partition assignment and one set
+of offsets. The rules:
+
+- **Manual commit, only after success** (`AckMode.MANUAL_IMMEDIATE`, spec 14.4). `acknowledge()` runs
+  only when `handle()` returned, i.e. when the row is `SENT` or the event was deliberately skipped.
+- **One retry layer, not two.** A delivery failure is marked `FAILED` and then **rethrown**, and
+  `DefaultErrorHandler` + `ExponentialBackOffWithMaxRetries(3)` (1s / 2s / 4s) retries the whole
+  record before `DeadLetterPublishingRecoverer` publishes it to `<topic>.DLT`. The sender itself
+  attempts **once**; a second retry layer inside the method would be invisible to a restart.
+- **`setCommitRecovered(true)`.** With manual acks a recovered record would otherwise never have its
+  offset committed and would be replayed after any restart, sending the same email again. The
+  recoverer commits straight on the consumer once the record is safely dead-lettered.
+- **`addNotRetryableExceptions(MalformedEventException.class)`.** A payload that does not fit its
+  event type, or a record that cannot be parsed at all, fails identically every time, so it goes
+  straight to the DLT instead of sitting through three pointless rounds of backoff. Only *delivery*
+  failures are retried.
+- **`handle()` is not transactional.** Persistence lives in `NotificationStore`, one short
+  transaction per call (the `CartStore` split, D-062). The SMTP round trip therefore never happens
+  inside a transaction, and `markFailed` survives the exception the error handler is about to catch.
+- **The `FAILED` row is the admin's queue.** An event that ends up on the DLT is *not* in
+  `processed_events`, so `POST .../retry` is what picks it up — and the retry is a plain SMTP send,
+  not a Kafka replay, so it answers immediately.
+
+The bug worth recording: the first live run against the dev broker **froze the whole listener**. A
+record that is not valid JSON makes the *consumer* throw `RecordDeserializationException`, and
+`DefaultErrorHandler` refuses it — *"This error handler cannot process 'SerializationException's
+directly"* — so the container threw on every single poll and never advanced past that offset. Every
+partition in the container stalled behind it. The fix is to wrap both deserializers in
+`ErrorHandlingDeserializer`, which turns an unparseable record into a null value plus an exception
+header that the listener turns into a `MalformedEventException` and the error handler dead-letters.
+Unit tests could not have found this; only a real broker with a real poison record could.
+
+## D-083 — notification-service tests
+**57 tests**, all green. `NotificationPlannerTest` renders through the **real Thymeleaf templates**
+(a `SpringTemplateEngine` over `classpath:/templates/`), so a mistyped model attribute or a template
+name typo fails the build instead of the inbox; it also asserts the two behaviours that are easy to
+get wrong (a payment event with no address is skipped; a payload that does not fit its event type
+throws rather than being silently dropped). `NotificationEventConsumerTest` runs against an
+**embedded Kafka broker** with the mail sender mocked, and covers the paths a mock cannot: an event
+becomes a `SENT` row and a `processed_events` entry, a redelivered event sends nothing a second time,
+an event with no notification is acknowledged and stored nowhere, a payment event with no address is
+skipped rather than dead-lettered, a delivery that keeps failing lands on `order.events.DLT` with
+`retry_count = 3` and stays `FAILED`, an unparseable record is dead-lettered **and the consumer keeps
+working afterwards** (the D-082 regression), and a payload that does not fit is dead-lettered without
+retries. `SecurityConfigTest` runs the real filter chain with real signed tokens: anonymous is `401`,
+a wrong-key token is `401`, a customer is `403`, an admin is `200`.
+
+| Suite | Tests | Covers |
+|---|---|---|
+| `event/NotificationPlannerTest` | 16 | every event type → the right template and subject, all 10 templates render, money/URL formatting, skip rules, malformed payload |
+| `kafka/NotificationEventConsumerTest` | 7 | embedded broker: send + record + dedupe, no-notification events, D-081 skip, retry-then-DLT, poison record does not stall, malformed payload |
+| `service/NotificationServiceTest` | 15 | skip rules, row-before-send ordering, `markSentFromEvent` vs `markFailed` + rethrow, page clamping, detail body, the retry rules (`422` when `SENT`, failure recorded, re-retryable) |
+| `controller/AdminNotificationControllerTest` | 9 | list/detail/retry shapes, no envelope on success, `400` bad status, `404`, `422`, `503` |
+| `mail/MailNotificationSenderTest` | 3 | from/recipient/subject/HTML actually on the message, configurable from address, `MailSendException` → `NotificationDeliveryException` |
+| `config/SecurityConfigTest` | 6 | the real chain: `401` anonymous / malformed / forged, `403` customer, `200` admin, unknown API path still `401` |
+| `NotificationServiceApplicationTests` | 1 | context load (Eureka off, listeners off) |
+
+## D-084 — Gateway route for notification-service
+
+| Path | Target | Auth |
+|---|---|---|
+| `/api/v1/admin/notifications/**` | `lb://notification-service` | `ADMIN` |
+
+The service gets exactly one route because it has exactly one HTTP surface; `/api/v1/admin/**` on the
+gateway already carries the `ADMIN` requirement (D-035), so the downstream service re-validates the
+token independently rather than trusting the gateway. api-gateway is now at **31 tests**.

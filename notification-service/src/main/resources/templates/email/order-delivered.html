@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Order delivered</title>
+    <th:block th:replace="~{email/fragments :: styles}"></th:block>
+</head>
+<body>
+<div class="wrapper">
+    <div th:replace="~{email/fragments :: header}"></div>
+
+    <div class="card">
+        <p><span class="status status-ok">Delivered</span></p>
+
+        <h1>Order <span th:text="${orderNumber}">MS-000000</span> was delivered</h1>
+
+        <p>Hi <span th:text="${greetingName}">there</span>, your order has been delivered. We hope you
+            are happy with it.</p>
+
+        <p>Anything wrong? You can raise it from the order in your account.</p>
+
+        <p>
+            <a class="btn" th:href="${orderUrl}">View your order</a>
+        </p>
+    </div>
+
+    <div th:replace="~{email/fragments :: footer}"></div>
+</div>
+</body>
+</html>

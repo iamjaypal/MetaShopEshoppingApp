@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Order cancelled</title>
+    <th:block th:replace="~{email/fragments :: styles}"></th:block>
+</head>
+<body>
+<div class="wrapper">
+    <div th:replace="~{email/fragments :: header}"></div>
+
+    <div class="card">
+        <p><span class="status status-bad">Cancelled</span></p>
+
+        <h1>Order <span th:text="${orderNumber}">MS-000000</span> was cancelled</h1>
+
+        <p>Hi <span th:text="${greetingName}">there</span>, this order has been cancelled and the
+            reserved stock has been released.</p>
+
+        <div class="panel">
+            <p class="muted">Reason</p>
+            <p th:text="${reason}">Out of stock</p>
+        </div>
+
+        <p th:if="${refundRequired}">A refund is on its way. It usually appears on your statement
+            within a few business days, and you will get a separate email when it is issued.</p>
+
+        <p th:unless="${refundRequired}">Nothing was charged for this order, so there is nothing to refund.</p>
+
+        <p class="muted">If this was not expected, please contact support.</p>
+    </div>
+
+    <div th:replace="~{email/fragments :: footer}"></div>
+</div>
+</body>
+</html>

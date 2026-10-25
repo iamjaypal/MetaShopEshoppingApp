@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "MetaShop API",
-    "description": "MetaShop e-commerce API. Send everything through the API Gateway ({{gatewayUrl}}, :8080) — it validates the JWT, propagates X-User-* headers, adds X-Correlation-Id and rate limits the credential endpoints. The per-service folders ({{authUrl}} :8081, {{productUrl}} :8082) are kept for direct debugging and service-to-service calls. Login first, then copy data.accessToken into the accessToken variable.",
+    "description": "MetaShop e-commerce API. Send everything through the API Gateway ({{gatewayUrl}}, :8080) \u2014 it validates the JWT, propagates X-User-* headers, adds X-Correlation-Id and rate limits the credential endpoints. The per-service folders ({{authUrl}} :8081, {{productUrl}} :8082) are kept for direct debugging and service-to-service calls. Login first, then copy data.accessToken into the accessToken variable.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -48,6 +48,14 @@
     {
       "key": "internalToken",
       "value": "MetaShopDevOnlyInternalTokenChangeMe0123456789"
+    },
+    {
+      "key": "notificationUrl",
+      "value": "http://localhost:8087"
+    },
+    {
+      "key": "notificationId",
+      "value": "1"
     }
   ],
   "item": [
@@ -2448,7 +2456,7 @@
     },
     {
       "name": "Order Service",
-      "description": "Checkout and the order lifecycle (:8085). An order is created from the caller's cart — the only decision is the shipping address. Prices and the address are frozen as snapshots at checkout; stock is reserved through inventory-service (idempotent per orderId). The lifecycle is CREATED → CONFIRMED (payment) → SHIPPED → DELIVERED, with CANCELLED releasing the stock.",
+      "description": "Checkout and the order lifecycle (:8085). An order is created from the caller's cart \u2014 the only decision is the shipping address. Prices and the address are frozen as snapshots at checkout; stock is reserved through inventory-service (idempotent per orderId). The lifecycle is CREATED \u2192 CONFIRMED (payment) \u2192 SHIPPED \u2192 DELIVERED, with CANCELLED releasing the stock.",
       "item": [
         {
           "name": "Checkout (JWT)",
@@ -2999,7 +3007,7 @@
           "name": "Guard rails",
           "item": [
             {
-              "name": "Pay someone else's / unknown order → 404",
+              "name": "Pay someone else's / unknown order \u2192 404",
               "request": {
                 "method": "POST",
                 "header": [
@@ -3033,11 +3041,11 @@
                     }
                   }
                 },
-                "description": "Same 404 for unknown and foreign orders — ids cannot be probed."
+                "description": "Same 404 for unknown and foreign orders \u2014 ids cannot be probed."
               }
             },
             {
-              "name": "Pay a settled order → 422",
+              "name": "Pay a settled order \u2192 422",
               "request": {
                 "method": "POST",
                 "header": [
@@ -3071,11 +3079,11 @@
                     }
                   }
                 },
-                "description": "Only orders in CREATED can be paid. Re-run after a capture → 422 (already paid / already confirmed)."
+                "description": "Only orders in CREATED can be paid. Re-run after a capture \u2192 422 (already paid / already confirmed)."
               }
             },
             {
-              "name": "Double click → 422 (charge in flight)",
+              "name": "Double click \u2192 422 (charge in flight)",
               "request": {
                 "method": "POST",
                 "header": [
@@ -3113,7 +3121,7 @@
               }
             },
             {
-              "name": "No token → 401",
+              "name": "No token \u2192 401",
               "request": {
                 "method": "GET",
                 "header": [],
@@ -3166,7 +3174,290 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Notification Service",
+      "description": "The event consumer and email sender (spec 13). It is driven entirely by Kafka: an event on user.events / order.events / payment.events / inventory.events is mapped to a Thymeleaf template, rendered, recorded in notifications, and sent through Spring Mail (Mailpit at http://localhost:8025 in dev). Its only HTTP surface is the admin log below. Nothing else in the stack publishes to Kafka yet, so drive the consumer with kafka-console-producer - and remember it sends ONE RECORD PER LINE.",
+      "item": [
+        {
+          "name": "Admin (ADMIN role)",
+          "item": [
+            {
+              "name": "The notification log",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications?page=0&size=20",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Every email this service tried to send, newest first. status is PENDING / SENT / FAILED; a FAILED row is the admin's retry queue. The rendered body is omitted from the list on purpose."
+              }
+            },
+            {
+              "name": "The log filtered by status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications?status=SENT&page=0&size=20",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "SENT"
+                    },
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "20"
+                    }
+                  ]
+                },
+                "description": "Every email this service tried to send, newest first. status is PENDING / SENT / FAILED; a FAILED row is the admin's retry queue. The rendered body is omitted from the list on purpose."
+              }
+            },
+            {
+              "name": "Failed sends only (the retry queue)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications?status=FAILED",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "FAILED"
+                    }
+                  ]
+                },
+                "description": "Every email this service tried to send, newest first. status is PENDING / SENT / FAILED; a FAILED row is the admin's retry queue. The rendered body is omitted from the list on purpose."
+              }
+            },
+            {
+              "name": "One notification, including the rendered email",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications/{{notificationId}}",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications",
+                    "{{notificationId}}"
+                  ]
+                },
+                "description": "Returns the notification plus the full rendered HTML that was (or will be) sent - the answer to what did the customer actually receive?"
+              }
+            },
+            {
+              "name": "Re-send a notification",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications/{{notificationId}}/retry",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications",
+                    "{{notificationId}}",
+                    "retry"
+                  ]
+                },
+                "description": "Replays the stored subject and body through SMTP once. 200 = sent; 422 if the notification is already SENT (that would duplicate the email); 503 if the mail server refuses again, leaving the row FAILED with the new reason."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guard rails",
+          "item": [
+            {
+              "name": "No token -> 401",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Unknown notification -> 404",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications/999999",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications",
+                    "999999"
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Unknown status value -> 400",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications?status=NOPE",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications"
+                  ],
+                  "query": [
+                    {
+                      "key": "status",
+                      "value": "NOPE"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "name": "Retry an already-sent notification -> 422",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  }
+                ],
+                "url": {
+                  "raw": "{{notificationUrl}}/api/v1/admin/notifications/{{notificationId}}/retry",
+                  "host": [
+                    "{{notificationUrl}}"
+                  ],
+                  "path": [
+                    "{{notificationUrl}}",
+                    "api",
+                    "v1",
+                    "admin",
+                    "notifications",
+                    "{{notificationId}}",
+                    "retry"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
-  "description": "MetaShop e-commerce API. Send everything through the API Gateway ({{gatewayUrl}}, :8080) — it validates the JWT, propagates X-User-* headers, adds X-Correlation-Id and rate limits the credential endpoints. The per-service folders ({{authUrl}} :8081, {{productUrl}} :8082, {{inventoryUrl}} :8083, {{cartUrl}} :8084, {{orderUrl}} :8085) are kept for direct debugging and service-to-service calls. Login first, then copy data.accessToken into the accessToken variable; service-to-service calls need the internalToken variable in X-Internal-Token."
+  "description": "MetaShop e-commerce API. Send everything through the API Gateway ({{gatewayUrl}}, :8080) \u2014 it validates the JWT, propagates X-User-* headers, adds X-Correlation-Id and rate limits the credential endpoints. The per-service folders ({{authUrl}} :8081, {{productUrl}} :8082, {{inventoryUrl}} :8083, {{cartUrl}} :8084, {{orderUrl}} :8085) are kept for direct debugging and service-to-service calls. Login first, then copy data.accessToken into the accessToken variable; service-to-service calls need the internalToken variable in X-Internal-Token."
 }

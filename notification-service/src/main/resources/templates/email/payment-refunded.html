@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Refund issued</title>
+    <th:block th:replace="~{email/fragments :: styles}"></th:block>
+</head>
+<body>
+<div class="wrapper">
+    <div th:replace="~{email/fragments :: header}"></div>
+
+    <div class="card">
+        <p><span class="status status-warn">Refunded</span></p>
+
+        <h1>Your refund has been issued</h1>
+
+        <p>Hi <span th:text="${greetingName}">there</span>, we have refunded your payment for order
+            <span th:text="${orderId}">1</span>.</p>
+
+        <div class="panel">
+            <p class="muted">Refunded amount</p>
+            <p class="total" th:text="${amount}">&#8377;0.00</p>
+            <p class="muted">Payment reference</p>
+            <p th:text="${paymentId}">1</p>
+        </div>
+
+        <p class="muted">Depending on your bank it can take a few business days to appear on your
+            statement.</p>
+    </div>
+
+    <div th:replace="~{email/fragments :: footer}"></div>
+</div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Payment failed</title>
+    <th:block th:replace="~{email/fragments :: styles}"></th:block>
+</head>
+<body>
+<div class="wrapper">
+    <div th:replace="~{email/fragments :: header}"></div>
+
+    <div class="card">
+        <p><span class="status status-bad">Payment failed</span></p>
+
+        <h1>We could not process your payment</h1>
+
+        <p>Hi <span th:text="${greetingName}">there</span>, your payment did not go through, so order
+            <span th:text="${orderId}">1</span> has not been placed. Nothing has been charged.</p>
+
+        <div class="panel">
+            <p class="muted">What the payment provider said</p>
+            <p th:text="${reason}">Insufficient funds</p>
+        </div>
+
+        <p>The stock we had reserved for you has been released, so if the item is popular it may sell
+            out before you try again.</p>
+
+        <p>
+            <a class="btn" th:href="${checkoutUrl}">Try the payment again</a>
+        </p>
+    </div>
+
+    <div th:replace="~{email/fragments :: footer}"></div>
+</div>
+</body>
+</html>
