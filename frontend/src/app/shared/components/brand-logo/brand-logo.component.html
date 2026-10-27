@@ -1,16 +1,6 @@
 <span class="logo" [class.logo--light]="light()">
   <span class="logo__mark" [style.width]="markSize()" [style.height]="markSize()">
-    <!-- The "M" glyph, matching public/favicon.svg -->
-    <svg viewBox="0 0 64 64" aria-hidden="true">
-      <defs>
-        <linearGradient id="logo-grad" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#6D5DF6" />
-          <stop offset="1" stop-color="#A05DF6" />
-        </linearGradient>
-      </defs>
-      <rect width="64" height="64" rx="16" fill="url(#logo-grad)" />
-      <path d="M18 22 L32 40 L46 22 L46 44 L39 44 L39 33 L32 42 L25 33 L25 44 L18 44 Z" fill="#fff" />
-    </svg>
+   <img class="logo_img_metashop" src="/assets/favicon.png" alt="MetaShopLogo"/>
   </span>
 
   @if (showWordmark()) {

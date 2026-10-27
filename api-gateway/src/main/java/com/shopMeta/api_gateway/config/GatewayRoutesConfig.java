@@ -14,7 +14,9 @@ import org.springframework.context.annotation.Configuration;
  * Gateway route table (spec 6.2).
  *
  * <p>Paths are versioned as {@code /api/v1/**} (see docs/DECISIONS.md D-003) and are forwarded to
- * the downstream services unchanged. Each route carries an {@link com.shopMeta.api_gateway.security.AuthRequirement}
+ * the downstream services unchanged. The one exception is {@code /uploads/**}: product-service
+ * returns image URLs relative to its own origin, so the gateway forwards those to it as well.
+ * Each route carries an {@link com.shopMeta.api_gateway.security.AuthRequirement}
  * so the JWT filter does not have to hard-code path rules.
  *
  * <p>Only services that are actually deployed get a route: auth-service, product-service,
@@ -57,6 +59,14 @@ public class GatewayRoutesConfig {
                         .path("/api/v1/products/**",
                                 "/api/v1/categories/**",
                                 "/api/v1/brands/**")
+                        .metadata(METADATA_KEY, PUBLIC.name())
+                        .uri("lb://product-service"))
+
+                // Product images are stored locally by product-service and returned with a
+                // relative /uploads/... URL, so the browser requests them from the gateway
+                // origin. They are public data (no auth), like the catalogue itself.
+                .route("product-service-uploads", r -> r
+                        .path("/uploads/**")
                         .metadata(METADATA_KEY, PUBLIC.name())
                         .uri("lb://product-service"))
 

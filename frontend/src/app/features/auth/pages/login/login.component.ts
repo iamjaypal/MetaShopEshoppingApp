@@ -9,11 +9,7 @@ import { ToastService } from '../../../../core/services/toast.service';
 import { ApiError } from '../../../../core/models/api-error';
 import { BrandLogoComponent } from '../../../../shared/components/brand-logo/brand-logo.component';
 
-/**
- * The sign-in page. On success the session is stored and the user is sent to
- * `returnUrl` (or the account page). A refused sign-in shakes the card and
- * shows the backend's message inline.
- */
+
 @Component({
   selector: 'app-login',
   standalone: true,
@@ -41,8 +37,6 @@ export class LoginComponent {
   });
 
   constructor() {
-    // Arriving from a link that carries context (e.g. ?email= after
-    // registering) — pre-fill what we were given.
     const email = this.route.snapshot.queryParamMap.get('email');
     if (email) {
       this.form.controls.email.setValue(email);

@@ -1,13 +1,3 @@
-/* ==========================================================================
-   MetaShop design system
-   --------------------------------------------------------------------------
-   The single source of shared styling. Every component stylesheet only
-   holds what is unique to that component — anything reusable (tokens,
-   buttons, form fields, cards, animations, auth layout) lives here so it
-   is written exactly once.
-   ========================================================================== */
-
-/* --------------------------------------------------------------- tokens -- */
 :root {
   /* Brand — indigo to violet */
   --brand-50:  #f2f0ff;
@@ -540,11 +530,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; }
   .form-row .field + .field { margin-top: 16px; }
 }
 
-/* ========================================================== ADMIN CONSOLE
-   Shared primitives for the admin pages (tables, stat tiles, toolbars,
-   page heads). The admin shell layout lives in its component. */
 
-/* page head with title + optional action */
 .admin-head {
   display: flex;
   align-items: center;

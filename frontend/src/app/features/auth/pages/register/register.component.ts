@@ -13,11 +13,6 @@ import {
   passwordStrength, passwordsMatch, strongPassword,
 } from '../../../../shared/validators/password.validators';
 
-/**
- * The sign-up page. Creates the account, then routes to the login page with
- * the email pre-filled (the backend returns no tokens on register — signing
- * in is an explicit step).
- */
 @Component({
   selector: 'app-register',
   standalone: true,
@@ -48,11 +43,6 @@ export class RegisterComponent {
       Validators.maxLength(50),
     ]),
     email: new FormControl('', [Validators.required, Validators.email]),
-    phone: new FormControl('', [
-      Validators.required,
-      // auth-service requires international format, e.g. +919876543210
-      Validators.pattern(/^\+[1-9]\d{7,14}$/),
-    ]),
     password: new FormControl('', [Validators.required, strongPassword()]),
     confirmPassword: new FormControl('', [Validators.required]),
     terms: new FormControl(false, [Validators.requiredTrue]),
@@ -86,7 +76,6 @@ export class RegisterComponent {
       firstName: this.form.controls.firstName.value!.trim(),
       lastName: this.form.controls.lastName.value!.trim(),
       email: this.form.controls.email.value!.trim(),
-      phone: this.form.controls.phone.value!.trim(),
       password: this.form.controls.password.value!,
     }).subscribe({
       next: account => {

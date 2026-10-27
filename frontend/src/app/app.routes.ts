@@ -4,18 +4,9 @@ import { adminGuard } from './core/guards/admin.guard';
 import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
 
-/**
- * Route table.
- *
- * - `/login` and `/register` render standalone (no navbar/footer).
- * - Everything else renders inside the storefront shell (navbar + footer):
- *   home, the catalogue and product pages today; cart/orders phase by phase —
- *   those routes still point at honest placeholders.
- */
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'home' },
 
-  // ---- auth (no shell) ----
   {
     path: 'login',
     canActivate: [guestGuard],

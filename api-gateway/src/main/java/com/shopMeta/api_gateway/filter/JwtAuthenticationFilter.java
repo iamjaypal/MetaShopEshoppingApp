@@ -28,17 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import reactor.core.publisher.Mono;
 
-/**
- * Validates the access token and propagates the caller identity downstream (spec 5.4 / 6.2).
- *
- * <ul>
- *   <li>Reads the {@link AuthRequirement} from the matched route's metadata.</li>
- *   <li>Any inbound {@code X-User-Id} / {@code X-User-Email} / {@code X-User-Roles} header is
- *       <strong>always removed</strong>, so a client can never spoof another user by setting them.</li>
- *   <li>For {@code JWT} / {@code ADMIN} routes a valid bearer token is mandatory; the identity
- *       headers are then re-added from the token claims.</li>
- * </ul>
- */
+
 @Slf4j
 @Component
 @RequiredArgsConstructor

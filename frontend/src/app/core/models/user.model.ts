@@ -1,9 +1,3 @@
-/**
- * Auth-related contracts, mirroring auth-service's DTOs exactly
- * (`UserSummary`, `LoginResponse`, `RegisterResponse`, …).
- */
-
-/** Who the caller is — matches auth-service `UserSummary`. */
 export interface UserSummary {
   id: number;
   firstName: string;
@@ -24,11 +18,10 @@ export interface RegisterRequest {
   firstName: string;
   lastName: string;
   email: string;
-  phone: string;
   password: string;
 }
 
-/** Matches auth-service `RegisterResponse` (no tokens — register then sign in). */
+
 export interface RegisterResponse {
   id: number;
   firstName: string;

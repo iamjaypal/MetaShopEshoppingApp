@@ -1,9 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
-/**
- * The MetaShop brand mark: a gradient tile with the "M" glyph, plus the
- * optional wordmark. Used on the auth pages today, the navbar next.
- */
 @Component({
   selector: 'app-brand-logo',
   standalone: true,

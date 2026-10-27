@@ -51,10 +51,6 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final SecurityProperties securityProperties;
 
-    /**
-     * Registers a new CUSTOMER (spec 7.3). Email is unique, case-insensitive; a duplicate
-     * results in 409. The password must satisfy the policy in spec 7.4.
-     */
     @Transactional
     public RegisterResponse register(RegisterRequest request) {
 
@@ -98,10 +94,7 @@ public class AuthService {
                 .build();
     }
 
-    /**
-     * Authenticates a user and returns an access/refresh token pair (spec 7.3).
-     * Locks the account for a while after {@code maxFailedLoginAttempts} failures (spec 7.4).
-     */
+
     @Transactional(noRollbackFor = { InvalidCredentialsException.class, AccountLockedException.class })
     public LoginResponse login(LoginRequest request) {
 

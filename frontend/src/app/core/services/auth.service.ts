@@ -9,12 +9,6 @@ import { LoginRequest, LoginResponse, RegisterRequest, RegisterResponse,
   UpdateProfileRequest, ChangePasswordRequest, UserSummary }
   from '../models/user.model';
 
-/**
- * The session state + the calls to auth-service (`/api/v1/auth/**`).
- *
- * The current user is a signal so every component reading it re-renders
- * automatically when the session changes (sign-in, profile refresh, sign-out).
- */
 @Injectable({ providedIn: 'root' })
 export class AuthService {
 
@@ -34,10 +28,6 @@ export class AuthService {
 
   private readonly API = '/api/v1/auth';
 
-  /**
-   * Signs in, persists the session and publishes the user.
-   * Resolves with the verified user so callers can toast/navigate.
-   */
   login(request: LoginRequest): Observable<UserSummary> {
     return this.http.post<ApiResponse<LoginResponse>>(`${this.API}/login`, request)
       .pipe(map(response => {
@@ -48,11 +38,7 @@ export class AuthService {
       }));
   }
 
-  /**
-   * Creates the account. The backend does not return tokens for register
-   * (sign in explicitly afterwards), so this resolves and the caller routes
-   * to the login page.
-   */
+
   register(request: RegisterRequest): Observable<RegisterResponse> {
     return this.http.post<ApiResponse<RegisterResponse>>(`${this.API}/register`, request)
       .pipe(map(response => response.data));
@@ -84,14 +70,14 @@ export class AuthService {
       .pipe(map(() => undefined));
   }
 
-  /**
-   * Signs out: tells the backend to revoke the refresh token (best effort —
-   * the local session is cleared either way), then clears state.
-   */
   logout(): void {
-    this.http.post<ApiResponse<void>>(`${this.API}/logout`, {})
-      .pipe(catchError(() => of(null)))
-      .subscribe(() => this.endLocalSession());
+    const refreshToken = this.storage.getRefreshToken();
+    const revoke = refreshToken
+      ? this.http.post<ApiResponse<void>>(`${this.API}/logout`, { refreshToken })
+          .pipe(catchError(() => of(null)))
+      : of(null);
+
+    revoke.subscribe(() => this.endLocalSession());
   }
 
   /** Clears the local session without calling the backend. */
